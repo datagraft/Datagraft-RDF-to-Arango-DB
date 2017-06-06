@@ -32,3 +32,4 @@ To import and make new collection (exchange "test" / "test_edge" with the collec
 ## Future improvments
 - Implementing a csv parser, so we ensure it is not braking on bad formatting / different formatting than whats coded.
 - Run the mapping per line while reading the csv, don't read everything in to memory before transforming.
+- Inserting information into the DB with the REST API inserting information on a stream basis?
