@@ -1,4 +1,4 @@
-# Datagraft-RDF-to-Arango-DB-
+# Datagraft-RDF-to-Arango-DB
 A node script to transform datagraft RDF mappings to Arango DB values
 
 ## How to use the script
