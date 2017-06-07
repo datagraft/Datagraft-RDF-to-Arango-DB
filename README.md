@@ -27,7 +27,10 @@ To import and make new collection (exchange "test" / "test_edge" with the collec
 
 ```docker exec -i arangodb arangoimp --file arangoedge.json --collection test_edge --create-collection true --create-collection-type edge --from-collection-prefix test --to-collection-prefix test```
 
+### importing the csv directly (not makin a graph)
+```docker cp csvdocument.csv arangodb:/csvdocument.csv```
 
+```docker exec -i arangodb arangoimp --file csvdocument.csv --type csv --collection test_csv --create-collection true```
 
 ## Future improvments
 - Implementing a csv parser, so we ensure it is not braking on bad formatting / different formatting than whats coded.
