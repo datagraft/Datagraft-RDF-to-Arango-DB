@@ -13,7 +13,9 @@ To run the script localy start a comand-window to run node localy
 The json files has one object per line, therby noe filesize limitation when using the arango import function
 
 ## How to import to ArangoDB
-Run these lines of code to copy the files to the container, and import values into Arango.
+Run these lines of code to copy the files to the docker container, and import values into Arango.
+
+NB! substitut "arangodb" with the name of your docker instance
 
 To copy the files:
 
