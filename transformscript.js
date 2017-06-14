@@ -1,28 +1,162 @@
 /* load the rdf mapping and vocab into the script */
-.load rdfMapping.js
-.load rdfVocab.js
+//.load rdfMapping.js
+//.load rdfVocab.js
+const bodyParser = require('body-parser');
+const jsonParser = bodyParser.json();
+const logging = require('./logging');
+const multer  = require('multer');
+const fs = require('fs');
 
-/* Containers for transformation data */
-var vocab = [];
+const request = require('request');
+
+
+const storage =   multer.diskStorage({
+  destination: function (req, file, callback) {
+     callback(null, './uploads/');
+  },
+  filename: function (req, file, callback) {
+    callback(null, file.fieldname + '-' + Date.now());
+  }
+});
+
+const upload = multer({ storage: storage });
+
+const cpUpload = upload.fields([{ name: 'csv', maxCount: 1 }, { name: 'mapping', maxCount: 1 }, { name: 'vocabulary', maxCount: 1 }]);
+
+module.exports = (app) => {
+    
+    
+app.post('/', cpUpload, (req, res) => {
+      
+    const showAndLogError = (res, status, message, data) => {
+    // If the headers are already sent, it probably means the server has started to
+    // provide a message and it's better to just keep the same message instead of
+    // crashing trying to send already sent headers
+    if (!res.headersSent) {
+      res.status(status).json({
+        error: message,
+        data
+      });
+    }
+
+    logging.error(message, data);
+  };
+    
+   
+   
+    
+    
+ var mapping =   JSON.parse(fs.readFileSync(req.files.mapping[0].path).toString());
+ var vocabulary = JSON.parse(fs.readFileSync(req.files.vocabulary[0].path).toString()); 
+ var csv = req.files.csv[0];
+ var path = req.files.csv[0].path;
+ 
+
+    if (!mapping) {
+      showAndLogError(res, 400, 'The RDF mapping is missing');
+      return;
+    }
+
+    if (!vocabulary) {
+      showAndLogError(res, 400, 'The RDF vocabulary is missing');
+      return;
+    }
+
+    if (!csv) {
+      showAndLogError(res, 400, 'The source csv is missing');
+      return;
+    }
+
+    var vocab = [];
 var headings = {};
-var buffer;
 
-/*Make vocabs for dataset*/
-for(var i = 0; i < data_vocab.length; i++){
+    
+    /*Make vocabs for dataset*/
+for(var i = 0; i < vocabulary.length; i++){
     if(i == 0){vocab = [];}
-    var key = data_vocab[i].name;
-    vocab[key] = data_vocab[i];
+    var key = vocabulary[i].name;
+    vocab[key] = vocabulary[i];
+}
+ /*Hash function  - used to hash namespaces for keys*/
+String.prototype.hashCode = function () {
+    var hash = 0;
+    if (this.length == 0) return hash;
+    for (i = 0; i < this.length; i++) {
+        char = this.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    return (hash + 2147483647) + 1; 
+};
+
+
+
+
+function write_array(arangoValue, arangoEdge){
+    var fs = require('fs');
+    
+    //var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
+    var stamp = Date.now();
+    fs.writeFile("results/" + stamp + "_arango_value.json", JSON.stringify(arangoValue), function(err) {
+    
+        if(err) {
+            return console.log(err);
+        }
+        console.log("The file was saved!");
+    });
+    
+    fs.writeFile("results/" + stamp + "_arango_edge.json", JSON.stringify(arangoEdge), function(err) {
+    
+        if(err) {
+            return console.log(err);
+        }
+        console.log("The file was saved!");
+    });
 }
 
-/*Read function of the csv file*/
-function read(input) {
-    buffer = [];
-    fs.readFile(input, "utf-8", (err, data) => {
-        if (err) throw err;
-        // console.log(data);
-        buffer = data.split('\n');
+function write_object(arangoValue, arangoEdge){
+    var fs = require('fs');
+    var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
+    
+    //write nodes
+    console.log("writing node values to file...");
+    for(var i = 0; i < arangoValue.length; i++){
+        fs.appendFileSync(stamp + "_arango_value.json", JSON.stringify(arangoValue[i]) + '\n', function(err) {
+            if(err) {
+                return console.log(err);
+            }
+            //console.log("The file was started...");
+        }); 
+    }
+    
+    console.log("The file \""+stamp+"_arango_value.json\" was saved!");
+    console.log("writing edge values to file...");
+    
+    //Write edges
+    for(var i = 0; i < arangoEdge.length; i++){
+            fs.appendFileSync(stamp + "_arango_edge.json", JSON.stringify(arangoEdge[i])+'\n', function(err) {
+                if(err) {
+                    return console.log(err);
+                }
+                //console.log("The file was started...");
+            }); 
+    }
+    
+    console.log("The file \""+stamp+"_arango_edge.json\" was saved!");
+}
 
-        console.log(buffer.length);
+
+    var buffer;
+    
+        fs.readFile(path, "utf-8", (err, data) => {
+        if (err) {
+            console.log(err);
+            //showAndLogError(res, 400, 'Error reading file');
+            return;
+        }
+    
+       buffer = data.split('\n');
+
 
         //Make arrays of each line
         for (var i = 0; i < buffer.length; i++) {
@@ -53,38 +187,15 @@ function read(input) {
             }
             
             buffer[i] = buffer2;
-            /*for(var j = 0; j < buffer[i].length; j++){
-                buffer[i][j] = buffer[i][j].substring(1, buffer[i][j].length-1);
-            }*/
         }
-    });
-}
 
-/*Hash function  - used to hash namespaces for keys*/
-String.prototype.hashCode = function () {
-    var hash = 0;
-    if (this.length == 0) return hash;
-    for (i = 0; i < this.length; i++) {
-        char = this.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return (hash + 2147483647) + 1; 
-}
-
-
-/*Build array for headings, to lookup colum positions*/
-function build() {
-    headings = []; //reset headings
+       headings = []; //reset headings
     for (var i = 0; i < buffer[0].length; i++) { //for all elements i first buffer row
         var value = buffer[0][i];
         headings[value] = i; //add an entry with value as key and arrayposition as value
     }
-};
-
-//function to transform structure
-function the(data, buffer){
-    var count = 0;
+            
+                var count = 0;
     var arango_value = [];  //main value array
     var arango_value2 = {}; //array for namepsace nodes
     var arango_edge = [];   //array for all edges
@@ -92,29 +203,22 @@ function the(data, buffer){
     var head = headings;
     
     
-    function loop(data, line){            
+    function loop(mapping, line){            
         var obj = {}
     
-        if(data !== null){
+        if(mapping !== null){
             obj = {"_key":count.toString()};
             obj['namespace+id'] = "";
-            //console.log(obj._key);
+            
             count ++;
         }
         
-        for(key in data){
+        for(key in mapping){
             
             //console.log(key);
             
             if(key === "prefix"){
-              /*  console.log("------------------")
-                console.log("get prefix!")
-                console.log(data[key])
-                console.log(vocab[data[key]])
-                console.log(data)
-                console.log("------------------")
-                */
-                obj['namespace'] = vocab[data[key]].namespace;
+                obj['namespace'] = vocab[mapping[key]].namespace;
                                 
                 var nameHash = obj.namespace.hashCode().toString();
                 var isThere = false;
@@ -130,46 +234,46 @@ function the(data, buffer){
                 if(!isThere && nameHash !== undefined){
                     arango_value2[nameHash] = {"_key": nameHash, "label": obj.namespace};
                     arango_edge.push({"_from": 0, "_to": nameHash});
-                    //console.log(arango_value2);
+            
                 }
                 
-                obj['namespace+id'] = vocab[data[key]].namespace;                
+                obj['namespace+id'] = vocab[mapping[key]].namespace;                
             }
             
             if(key === 'constant' || key === "propertyName"){
-                obj['namespace+id'] += data[key];                
+                obj['namespace+id'] += mapping[key];                
             }
             
             if(key === "column" || key === "literalValue"){
-                var test = data[key].value;
+                var test = mapping[key].value;
                 var field = head[test];
                 var val = line[field];
 
-                obj[key] = data[key].value;
+                obj[key] = mapping[key].value;
                 obj['value'] = line[field];
 
                 if(!isNaN(obj.value)){
                     obj.value = +obj.value;
                 }   
 
-            }else if(Array.isArray(data[key])){
-                data[key].forEach(function(entry) {
+            }else if(Array.isArray(mapping[key])){
+                mapping[key].forEach(function(entry) {
                     var ArrToObj = {"_from": obj._key, "_to":loop(entry, line)};
                     if(typeof ArrToObj._to != 'undefined'){
                         arango_edge.push(ArrToObj);
                     }
                 });
-            }else if(typeof data[key] === 'object'){
-                var ObjToObj = {"_from": obj._key, "_to":loop(data[key], line)};
+            }else if(typeof mapping[key] === 'object'){
+                var ObjToObj = {"_from": obj._key, "_to":loop(mapping[key], line)};
                 if(typeof ObjToObj._to != 'undefined'){
                     arango_edge.push(ObjToObj);
                 }
             }else{
-                obj[key] = data[key];
+                obj[key] = mapping[key];
             }
         }
         
-        if(data !== null){
+        if(mapping !== null){
             obj['label'] = "";
             
             if(typeof obj.prefix != 'undefined'){
@@ -231,10 +335,10 @@ function the(data, buffer){
     
     for(var i = 1; i < buffer.length; i++){
     //for(var i = 1; i < 3; i++){
-        //console.log(buffer[i][0]);
+        
         arango_edge.push({"_from": 0, "_to":(count).toString()});
-        obKey = loop(data, buffer[i]);
-        //console.log(obKey);
+        obKey = loop(mapping, buffer[i]);
+        
     }
     
     //delete rootNode.graphRoots;
@@ -258,63 +362,14 @@ function the(data, buffer){
     
     //Save as array with objects
     write_array(arango_value, arango_edge);
-    
-    //Save one object per line
-    //write_object(arango_value, arango_edge);
-        
-}
+            
+        res.send('ok');     
+    }); 
 
-function write_array(arangoValue, arangoEdge){
-    var fs = require('fs');
     
-    var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
-    
-    fs.writeFile(stamp + "_arango_value.json", JSON.stringify(arangoValue), function(err) {
-        if(err) {
-            return console.log(err);
-        }
-        console.log("The file was saved!");
-    });
-    
-    fs.writeFile(stamp + "_arango_edge.json", JSON.stringify(arangoEdge), function(err) {
-        if(err) {
-            return console.log(err);
-        }
-        console.log("The file was saved!");
-    });
-}
+     
+ });
+};
 
-function write_object(arangoValue, arangoEdge){
-    var fs = require('fs');
-    var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
-    
-    //write nodes
-    console.log("writing node values to file...");
-    for(var i = 0; i < arangoValue.length; i++){
-        fs.appendFileSync(stamp + "_arango_value.json", JSON.stringify(arangoValue[i]) + '\n', function(err) {
-            if(err) {
-                return console.log(err);
-            }
-            //console.log("The file was started...");
-        }); 
-    }
-    
-    console.log("The file \""+stamp+"_arango_value.json\" was saved!");
-    console.log("writing edge values to file...");
-    
-    //Write edges
-    for(var i = 0; i < arangoEdge.length; i++){
-            fs.appendFileSync(stamp + "_arango_edge.json", JSON.stringify(arangoEdge[i])+'\n', function(err) {
-                if(err) {
-                    return console.log(err);
-                }
-                //console.log("The file was started...");
-            }); 
-    }
-    
-    console.log("The file \""+stamp+"_arango_edge.json\" was saved!");
-}
 
-function run(){
-    the(data, buffer);
-}
+

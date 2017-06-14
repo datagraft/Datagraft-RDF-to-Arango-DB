@@ -58,5 +58,7 @@ typings/
 .env
 
 # dont save transformed json files - this are enormus.
-arango_value.json
-arango_edge.json
+results/
+
+# Uploaded files
+uploads/
