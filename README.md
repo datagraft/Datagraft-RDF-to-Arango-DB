@@ -9,6 +9,8 @@ Also add your database endpoint to the value `connection` in the same file.
 
 NB! this is baste on doing AJAX calls and requiers that the application has acces to jquery
 
+Documentation for the REST calls to arangodb, and what the body sendt to Arango should be, can be found [here](https://docs.arangodb.com/3.1/HTTP/)
+
 ## How to use the script
 To run the script localy start a comand-window to run node localy
 
