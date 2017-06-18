@@ -1,6 +1,14 @@
 # Datagraft-RDF-to-Arango-DB
 A node script to transform datagraft RDF mappings to Arango DB values
 
+# REST.js
+First you'll need to obtain an token from DC/OS follow this link for how to obtain it: [Get token](https://docs.mesosphere.com/1.9/security/iam-api/#obtaining-an-authentication-token)
+
+Then insert the token into the value `authToken` in the `REST.js` file.
+Also add your database endpoint to the value `connection` in the same file. 
+
+NB! this is baste on doing AJAX calls and requiers that the application has acces to jquery
+
 ## How to use the script
 To run the script localy start a comand-window to run node localy
 
