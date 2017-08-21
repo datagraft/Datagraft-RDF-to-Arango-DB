@@ -1,6 +1,10 @@
 # Datagraft-RDF-to-Arango-DB
 A node script to transform datagraft RDF mappings to Arango DB values
 
+## Prerequisite
+This script uses the datalib [http://vega.github.io/datalib/] to parse csv. Make sure this is installed/avaiable before running the script.
+This can be installed using eg node `npm install datalib` or check the github pages for more info.
+
 ## How to use the script
 To run the script localy start a comand-window to run node localy
 

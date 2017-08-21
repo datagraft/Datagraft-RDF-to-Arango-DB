@@ -2,6 +2,8 @@
 .load rdfMapping.js
 .load rdfVocab.js
 
+const dl = require('datalib');
+
 /* Containers for transformation data */
 var vocab = [];
 var headings = {};
@@ -16,48 +18,16 @@ for(var i = 0; i < data_vocab.length; i++){
 
 /*Read function of the csv file*/
 function read(input) {
-    buffer = [];
-    fs.readFile(input, "utf-8", (err, data) => {
-        if (err) throw err;
-        // console.log(data);
-        buffer = data.split('\n');
-
-        console.log(buffer.length);
-
-        //Make arrays of each line
-        for (var i = 0; i < buffer.length; i++) {
-            buffer[i] = buffer[i].split(',');
-            
-            var buffer2 = [];
-            var string = "";
-            var makingstring = false;
-            
-            for(var j = 0; j < buffer[i].length; j++){
-                if(!makingstring){
-                    if(buffer[i][j].charAt(0) == '"'){
-                        makingstring = true;
-                    }else{
-                        buffer2.push(buffer[i][j]);
-                    }
-                }
-                
-                if(buffer[i][j].charAt(buffer[i][j].length-1) == '"'){
-                    string += buffer[i][j];
-                    buffer2.push(string.substring(1, string.length -1));
-                        
-                    string = "";
-                    makingstring = false;
-                }else if(makingstring){
-                    string += buffer[i][j];
-                }
-            }
-            
-            buffer[i] = buffer2;
-            /*for(var j = 0; j < buffer[i].length; j++){
-                buffer[i][j] = buffer[i][j].substring(1, buffer[i][j].length-1);
-            }*/
-        }
-    });
+    
+    //parse the input csv file with datalib
+    buffer = dl.csv(input);
+    
+    headings = []; //reset headings
+    
+    for (var i = 0; i < buffer.columns.length; i++) { //for all elements i colums array from datalib parse
+        var value = buffer.columns[i];
+        headings[value] = i; //add an entry with value as key and arrayposition as value
+    }
 }
 
 /*Hash function  - used to hash namespaces for keys*/
@@ -76,8 +46,8 @@ String.prototype.hashCode = function () {
 /*Build array for headings, to lookup colum positions*/
 function build() {
     headings = []; //reset headings
-    for (var i = 0; i < buffer[0].length; i++) { //for all elements i first buffer row
-        var value = buffer[0][i];
+    for (var i = 0; i < buffer.columns.length; i++) { //for all elements i first buffer row
+        var value = buffer.columns[i];
         headings[value] = i; //add an entry with value as key and arrayposition as value
     }
 };
