@@ -3,6 +3,7 @@
 .load rdfVocab.js
 
 const dl = require('datalib');
+const fs = require('fs');
 
 /* Containers for transformation data */
 var vocab = [];
@@ -58,10 +59,7 @@ function the(data, buffer){
     var arango_value = [];  //main value array
     var arango_value2 = {}; //array for namepsace nodes
     var arango_edge = [];   //array for all edges
-    
-    var head = headings;
-    
-    
+        
     function loop(data, line){            
         var obj = {}
     
@@ -74,7 +72,10 @@ function the(data, buffer){
         
         for(key in data){
             
-            //console.log(key);
+            if(key == "$$hashKey")
+            {
+                console.log(key);
+            }
             
             if(key === "prefix"){
               /*  console.log("------------------")
@@ -112,7 +113,7 @@ function the(data, buffer){
             
             if(key === "column" || key === "literalValue"){
                 var test = data[key].value;
-                var field = head[test];
+                var field = headings[test];
                 var val = line[field];
 
                 obj[key] = data[key].value;
@@ -135,7 +136,9 @@ function the(data, buffer){
                     arango_edge.push(ObjToObj);
                 }
             }else{
-                obj[key] = data[key];
+                if(key != "$$hashKey"){
+                    obj[key] = data[key];
+                }
             }
         }
         
@@ -235,8 +238,6 @@ function the(data, buffer){
 }
 
 function write_array(arangoValue, arangoEdge){
-    var fs = require('fs');
-    
     var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
     
     fs.writeFile(stamp + "_arango_value.json", JSON.stringify(arangoValue), function(err) {
@@ -255,7 +256,6 @@ function write_array(arangoValue, arangoEdge){
 }
 
 function write_object(arangoValue, arangoEdge){
-    var fs = require('fs');
     var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
     
     //write nodes
@@ -286,5 +286,6 @@ function write_object(arangoValue, arangoEdge){
 }
 
 function run(){
+    read("download2.csv");
     the(data, buffer);
 }
