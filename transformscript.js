@@ -7,7 +7,7 @@ const logging = require('./logging');
 const multer  = require('multer');
 const dl = require('datalib');
 const pap = require('./papaparse.min.js');
-const lineReader = require('line-reader');
+const lineReader = require('line-by-line');
 const fs = require('fs');
 
 const request = require('request');
@@ -138,25 +138,36 @@ module.exports = (app) => {
 
         var buffer;
 
-       /* console.log(typeof req.files.csv[0]);
-        pap.parse(req.files.csv[0], {
-            worker: false,
-            step: function(row){
-                console.log("Row " + row.data);
+       console.log(typeof req.files.csv[0].path);
+
+       pap.parse(req.files.csv[0], {
+           step: function(row){
+               console.log("Row " + row.data);
             },
             complete: function() {
                 console.log("All done!");
             }
-        });*/
+        });
+
         var count = 0;
+        var rowCount = 0;
         var arango_value = [];  //main value array
         var arango_value2 = {}; //array for namepsace nodes
         var arango_edge = [];   //array for all edges
         var head = false;
         headings = [];
 
-        lineReader.eachLine(path, function(row, last) {
+        lr = lineReader(path);
+        lr.on('error', function (err){
+            console.log(err);
+            lr.close();
+        })
+
+        lr.on('line', function(row) {
             row = pap.parse(row);
+
+            console.log("Row " + ++rowCount);
+
             if(row.errors.length > 0){
                 console.log("err " + row.errors);
                 return row.errors;
@@ -170,9 +181,9 @@ module.exports = (app) => {
                     headings[value] = i; //add an entry with value as key and arrayposition as value
                 }
                 console.log(headings);
-            } else {
+            } else if(true) {
 
-                console.log(row.data[0])
+                //console.log(row.data[0])
 
                 function loop(data, line){            
                     var obj = {}
@@ -320,30 +331,34 @@ module.exports = (app) => {
                 //for(var i = 1; i < 3; i++){
                     arango_edge.push({"_from": 0, "_to":(count).toString()});
                     obKey = loop(mapping, row.data[0][i]);
+                    //console.log("Row: " + i + " ObKey: " + obKey + " Count: " + count);
                 }
-                
-                if(last){
-                    //delete rootNode.graphRoots;
-                    arango_value.push(rootNode);
-                            
-                    /*Add all namespaces to node collection*/
-                    for(key in arango_value2){
-                        arango_value.push(arango_value2[key]);
-                    }
-                            
-                    /*Sort the info so it's easier to read*/
-                    arango_value.sort(function(a, b) {
-                        return a._key - b._key;
-                    });
-                            
-                    arango_edge.sort(function(a, b) {
-                        return a._from - b._from;
-                    });
-                    //Save as array with objects
-                    write_object(arango_value, arango_edge);         
-                    res.send('ok');                
-                }
+            }else{
+                console.log(row)
             }
+            lr.on('end', function () {
+                console.log("End");
+
+                //delete rootNode.graphRoots;
+                arango_value.push(rootNode);
+                        
+                /*Add all namespaces to node collection*/
+                for(key in arango_value2){
+                    arango_value.push(arango_value2[key]);
+                }
+                        
+                /*Sort the info so it's easier to read*/
+                arango_value.sort(function(a, b) {
+                    return a._key - b._key;
+                });
+                        
+                arango_edge.sort(function(a, b) {
+                    return a._from - b._from;
+                });
+                //Save as array with objects
+                write_object(arango_value, arango_edge);         
+                res.send('ok - count ' + count);                
+            });
         });
     });
 };
