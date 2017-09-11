@@ -5,9 +5,7 @@ const bodyParser = require('body-parser');
 const jsonParser = bodyParser.json();
 const logging = require('./logging');
 const multer  = require('multer');
-const dl = require('datalib');
-const pap = require('./papaparse.min.js');
-const lineReader = require('line-by-line');
+const pa = require('./papaparse.min.js');
 const fs = require('fs');
 
 const request = require('request');
@@ -138,50 +136,31 @@ module.exports = (app) => {
 
         var buffer;
 
-       console.log(typeof req.files.csv[0].path);
-
-       pap.parse(req.files.csv[0], {
-           step: function(row){
-               console.log("Row " + row.data);
-            },
-            complete: function() {
-                console.log("All done!");
-            }
-        });
-
         var count = 0;
         var rowCount = 0;
         var arango_value = [];  //main value array
         var arango_value2 = {}; //array for namepsace nodes
         var arango_edge = [];   //array for all edges
-        var head = false;
-        headings = [];
-
-        lr = lineReader(path);
-        lr.on('error', function (err){
-            console.log(err);
-            lr.close();
-        })
-
-        lr.on('line', function(row) {
-            row = pap.parse(row);
-
-            console.log("Row " + ++rowCount);
-
-            if(row.errors.length > 0){
-                console.log("err " + row.errors);
-                return row.errors;
-            }
-
-            if(head == false){
-                head = true;
-                console.log(row.data[0].length);
-                for (var i = 0; i < row.data[0].length; i++) { //for all elements i colums array from datalib parse
-                    var value = row.data[0][i];
+        var createdHeadings = false;
+        headings = []; //reset headings
+        
+        var lineReader = require('readline').createInterface({
+            input: fs.createReadStream(path)
+        });
+        
+        var lineCounter = 0;
+        lineReader.on('line', function (line) {
+            line = pa.parse(line);
+    
+            console.log("Line: " + ++lineCounter);
+    
+            if(!createdHeadings){
+                createdHeadings = true;
+                for (var i = 0; i < line.data[0].length; i++) { //for all elements i colums array from datalib parse
+                    var value = line.data[0][i];
                     headings[value] = i; //add an entry with value as key and arrayposition as value
                 }
-                console.log(headings);
-            } else if(true) {
+            } else {
 
                 //console.log(row.data[0])
 
@@ -333,31 +312,21 @@ module.exports = (app) => {
                     obKey = loop(mapping, row.data[0][i]);
                     //console.log("Row: " + i + " ObKey: " + obKey + " Count: " + count);
                 }
-            }else{
-                console.log(row)
-            }
-            lr.on('end', function () {
-                console.log("End");
+            };
 
-                //delete rootNode.graphRoots;
-                arango_value.push(rootNode);
-                        
+            lineReader.on('close', function(){
+                console.log("Done!");
+                console.log(arango_value_done);
                 /*Add all namespaces to node collection*/
                 for(key in arango_value2){
-                    arango_value.push(arango_value2[key]);
+                    arango_value_done.push(arango_value2[key]);
                 }
-                        
-                /*Sort the info so it's easier to read*/
-                arango_value.sort(function(a, b) {
-                    return a._key - b._key;
-                });
-                        
-                arango_edge.sort(function(a, b) {
-                    return a._from - b._from;
-                });
+                //console.log(arango_value_done)
                 //Save as array with objects
-                write_object(arango_value, arango_edge);         
-                res.send('ok - count ' + count);                
+                //write_array(arango_value, arango_edge);
+            
+                //Save one object per line
+                write_object(arango_value_done, arango_edge_done);
             });
         });
     });
