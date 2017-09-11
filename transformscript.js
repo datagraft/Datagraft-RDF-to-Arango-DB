@@ -2,6 +2,7 @@
 .load rdfMapping.js
 .load rdfVocab.js
 
+const pa = require('./papaparse.min.js');
 const dl = require('datalib');
 const fs = require('fs');
 
@@ -19,16 +20,46 @@ for(var i = 0; i < data_vocab.length; i++){
 
 /*Read function of the csv file*/
 function read(input) {
-    
-    //parse the input csv file with datalib
-    buffer = dl.csv(input);
-    
+
+    var createdHeadings = false;
     headings = []; //reset headings
     
-    for (var i = 0; i < buffer.columns.length; i++) { //for all elements i colums array from datalib parse
-        var value = buffer.columns[i];
-        headings[value] = i; //add an entry with value as key and arrayposition as value
-    }
+    var lineReader = require('readline').createInterface({
+        input: fs.createReadStream(input)
+    });
+    
+    var lineCounter = 0;
+    lineReader.on('line', function (line) {
+        line = pa.parse(line);
+
+        console.log("Line: " + ++lineCounter);
+
+        if(!createdHeadings){
+            createdHeadings = true;
+            for (var i = 0; i < line.data[0].length; i++) { //for all elements i colums array from datalib parse
+                var value = line.data[0][i];
+                headings[value] = i; //add an entry with value as key and arrayposition as value
+            }
+        }else{
+            the(data, line.data);
+        }
+    });
+
+    lineReader.on('close', function(){
+        console.log("Done!");
+        console.log(arango_value_done);
+        /*Add all namespaces to node collection*/
+        for(key in arango_value2){
+            arango_value_done.push(arango_value2[key]);
+        }
+        //console.log(arango_value_done);
+
+        //Save as array with objects
+        //write_array(arango_value, arango_edge);
+    
+        //Save one object per line
+        write_object(arango_value_done, arango_edge_done);
+    })
 }
 
 /*Hash function  - used to hash namespaces for keys*/
@@ -53,13 +84,17 @@ function build() {
     }
 };
 
+var count = 0;
+var arango_value_done = [];  //main value array
+var arango_value2 = {}; //array for namepsace nodes
+var arango_edge_done = [];   //array for all edges
+
 //function to transform structure
 function the(data, buffer){
-    var count = 0;
+    
     var arango_value = [];  //main value array
-    var arango_value2 = {}; //array for namepsace nodes
     var arango_edge = [];   //array for all edges
-        
+
     function loop(data, line){            
         var obj = {}
     
@@ -72,10 +107,10 @@ function the(data, buffer){
         
         for(key in data){
             
-            if(key == "$$hashKey")
+            /*if(key == "$$hashKey")
             {
                 console.log(key);
-            }
+            }*/
             
             if(key === "prefix"){
               /*  console.log("------------------")
@@ -140,7 +175,7 @@ function the(data, buffer){
                     obj[key] = data[key];
                 }
             }
-        }
+        } 
         
         if(data !== null){
             obj['label'] = "";
@@ -202,7 +237,7 @@ function the(data, buffer){
     var rootNode = {"_key":count.toString(), "label": "Start node", "value": "Start node"};
     count ++;
     
-    for(var i = 1; i < buffer.length; i++){
+    for(var i = 0; i < buffer.length; i++){
     //for(var i = 1; i < 3; i++){
         //console.log(buffer[i][0]);
         arango_edge.push({"_from": 0, "_to":(count).toString()});
@@ -213,10 +248,7 @@ function the(data, buffer){
     //delete rootNode.graphRoots;
     arango_value.push(rootNode);
     
-    /*Add all namespaces to node collection*/
-    for(key in arango_value2){
-        arango_value.push(arango_value2[key]);
-    }
+    
     
     /*Sort the info so it's easier to read*/
     arango_value.sort(function(a, b) {
@@ -227,17 +259,12 @@ function the(data, buffer){
         return a._from - b._from;
     });
     
-    
-    
-    //Save as array with objects
-    write_array(arango_value, arango_edge);
-    
-    //Save one object per line
-    //write_object(arango_value, arango_edge);
-        
+    arango_edge_done = arango_edge_done.concat(arango_edge);
+    arango_value_done = arango_value_done.concat(arango_value);
 }
 
 function write_array(arangoValue, arangoEdge){
+    console.log("array!");
     var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
     
     fs.writeFile(stamp + "_arango_value.json", JSON.stringify(arangoValue), function(err) {
@@ -256,11 +283,15 @@ function write_array(arangoValue, arangoEdge){
 }
 
 function write_object(arangoValue, arangoEdge){
+    console.log("object!");
+    console.log(arangoValue.length);
+    console.log()
     var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
     
     //write nodes
     console.log("writing node values to file...");
     for(var i = 0; i < arangoValue.length; i++){
+        console.log(JSON.stringify(arangoValue[i]));
         fs.appendFileSync(stamp + "_arango_value.json", JSON.stringify(arangoValue[i]) + '\n', function(err) {
             if(err) {
                 return console.log(err);
@@ -287,5 +318,5 @@ function write_object(arangoValue, arangoEdge){
 
 function run(){
     read("download2.csv");
-    the(data, buffer);
+    //the(data, buffer);
 }
