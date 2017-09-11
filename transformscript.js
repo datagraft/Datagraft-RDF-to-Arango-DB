@@ -274,10 +274,7 @@ module.exports = (app) => {
             return obj._key;
         };
 
-        var buffer;
-
         var count = 0;
-        var rowCount = 0;
         var arango_value = [];  //main value array
         var arango_value2 = {}; //array for namepsace nodes
         var arango_edge = [];   //array for all edges
