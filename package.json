@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "nodemon --ignore './results/' server.js",
     "test": "grunt test"
   },
   "devDependencies": {
@@ -29,8 +29,6 @@
     "time-grunt": "^1.3.0"
   },
   "dependencies": {
-    "datalib": "^1.8.0",
-    "line-by-line": "^0.1.5",
-    "line-reader": "^0.4.0"
+    "readline": "^1.3.0"
   }
 }

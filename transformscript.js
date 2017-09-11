@@ -7,6 +7,7 @@ const logging = require('./logging');
 const multer  = require('multer');
 const pa = require('./papaparse.min.js');
 const fs = require('fs');
+const rl = require('readline');
 
 const request = require('request');
 
@@ -134,6 +135,145 @@ module.exports = (app) => {
             console.log("The file \""+stamp+"_arango_edge.json\" was saved!");
         }
 
+        function map(data, line){            
+            var obj = {}
+        
+            if(data !== null){
+                obj = {"_key":count.toString()};
+                obj['namespace+id'] = "";
+                //console.log(obj._key);
+                count ++;
+            }
+    
+            for(key in data){
+                
+                if(key == "$$hashKey")
+                {
+                    //console.log(key);
+                }
+                
+                if(key === "prefix"){
+                /*  console.log("------------------")
+                    console.log("get prefix!")
+                    console.log(data[key])
+                    console.log(vocab[data[key]])
+                    console.log(data)
+                    console.log("------------------")
+                    */
+                    obj['namespace'] = vocab[data[key]].namespace;
+                                    
+                    var nameHash = obj.namespace.hashCode().toString();
+                    var isThere = false;
+                    
+                    if(arango_value2.length !== 0){
+                        for(key2 in arango_value2){
+                            if(key2 == nameHash){
+                                isThere = true;
+                            }
+                        }
+                    }
+                    
+                    if(!isThere && nameHash !== undefined){
+                        arango_value2[nameHash] = {"_key": nameHash, "label": obj.namespace};
+                        arango_edge.push({"_from": 0, "_to": nameHash});
+                        //console.log(arango_value2);
+                    }
+                    
+                    obj['namespace+id'] = vocab[data[key]].namespace;                
+                }
+                
+                if(key === 'constant' || key === "propertyName"){
+                    obj['namespace+id'] += data[key];                
+                }
+                
+                if(key === "column" || key === "literalValue"){
+                    var test = data[key].value;
+                    var field = headings[test];
+                    var val = line[field];
+
+                    obj[key] = data[key].value;
+                    obj['value'] = line[field];
+
+                    if(!isNaN(obj.value)){
+                        obj.value = +obj.value;
+                    }   
+
+                }else if(Array.isArray(data[key])){
+                    data[key].forEach(function(entry) {
+                        var ArrToObj = {"_from": obj._key, "_to":map(entry, line)};
+                        if(typeof ArrToObj._to != 'undefined'){
+                            arango_edge.push(ArrToObj);
+                        }
+                    });
+                }else if(typeof data[key] === 'object'){
+                    var ObjToObj = {"_from": obj._key, "_to":map(data[key], line)};
+                    if(typeof ObjToObj._to != 'undefined'){
+                        arango_edge.push(ObjToObj);
+                    }
+                }else{
+                    if(key != "$$hashKey"){
+                        obj[key] = data[key];
+                    }
+                }
+            }
+            
+            if(data !== null){
+                obj['label'] = "";
+                
+                if(typeof obj.prefix != 'undefined'){
+                    obj.label = obj.label + obj.prefix + " ";
+                }
+                
+                if(typeof obj.value != 'undefined'){
+                    obj.label = obj.label + obj.value;
+                }
+                
+                if(typeof obj.propertyName != 'undefined'){
+                    obj.label = obj.label + ": " + obj.propertyName;
+                }    
+                
+                //handle prefix mapping of keys here.....
+                
+                if(obj.__type !== "Property"){
+                    
+                    if(obj.value !== undefined){
+                        obj['namespace+id'] += obj.value.toString();
+                        obj['old_key'] = obj._key;
+                        obj._key = obj["namespace+id"].hashCode().toString();
+                        
+                        for(var i = 0; i < arango_edge.length; i++){
+                            if(arango_edge[i]._from === obj.old_key){
+                                arango_edge[i]._from = obj._key;
+                            }else if(arango_edge[i]._to === obj.old_key){
+                                arango_edge[i]._to = obj._key;
+                            }
+                            
+                        }
+                    }
+                    
+                    if(obj.namespace !== undefined){
+                        arango_edge.push({"_from":obj.namespace.hashCode().toString(), "_to":obj._key});
+                    }
+                }
+                
+                //End prefix handling of keys
+                var existsInSet = false;
+                
+                for (key in arango_value){
+                    if(arango_value[key]._key === obj._key){
+                        existsInSet = true;
+                        break;
+                    }
+                }
+                
+                if(!existsInSet){
+                    arango_value.push(obj);
+                }
+            }
+            
+            return obj._key;
+        };
+
         var buffer;
 
         var count = 0;
@@ -141,6 +281,7 @@ module.exports = (app) => {
         var arango_value = [];  //main value array
         var arango_value2 = {}; //array for namepsace nodes
         var arango_edge = [];   //array for all edges
+
         var createdHeadings = false;
         headings = []; //reset headings
         
@@ -160,174 +301,31 @@ module.exports = (app) => {
                     var value = line.data[0][i];
                     headings[value] = i; //add an entry with value as key and arrayposition as value
                 }
-            } else {
-
-                //console.log(row.data[0])
-
-                function loop(data, line){            
-                    var obj = {}
-                
-                    if(data !== null){
-                        obj = {"_key":count.toString()};
-                        obj['namespace+id'] = "";
-                        //console.log(obj._key);
-                        count ++;
-                    }
-            
-                    for(key in data){
-                        
-                        if(key == "$$hashKey")
-                        {
-                            //console.log(key);
-                        }
-                        
-                        if(key === "prefix"){
-                        /*  console.log("------------------")
-                            console.log("get prefix!")
-                            console.log(data[key])
-                            console.log(vocab[data[key]])
-                            console.log(data)
-                            console.log("------------------")
-                            */
-                            obj['namespace'] = vocab[data[key]].namespace;
-                                            
-                            var nameHash = obj.namespace.hashCode().toString();
-                            var isThere = false;
-                            
-                            if(arango_value2.length !== 0){
-                                for(key2 in arango_value2){
-                                    if(key2 == nameHash){
-                                        isThere = true;
-                                    }
-                                }
-                            }
-                            
-                            if(!isThere && nameHash !== undefined){
-                                arango_value2[nameHash] = {"_key": nameHash, "label": obj.namespace};
-                                arango_edge.push({"_from": 0, "_to": nameHash});
-                                //console.log(arango_value2);
-                            }
-                            
-                            obj['namespace+id'] = vocab[data[key]].namespace;                
-                        }
-                        
-                        if(key === 'constant' || key === "propertyName"){
-                            obj['namespace+id'] += data[key];                
-                        }
-                        
-                        if(key === "column" || key === "literalValue"){
-                            var test = data[key].value;
-                            var field = headings[test];
-                            var val = line[field];
-
-                            obj[key] = data[key].value;
-                            obj['value'] = line[field];
-
-                            if(!isNaN(obj.value)){
-                                obj.value = +obj.value;
-                            }   
-
-                        }else if(Array.isArray(data[key])){
-                            data[key].forEach(function(entry) {
-                                var ArrToObj = {"_from": obj._key, "_to":loop(entry, line)};
-                                if(typeof ArrToObj._to != 'undefined'){
-                                    arango_edge.push(ArrToObj);
-                                }
-                            });
-                        }else if(typeof data[key] === 'object'){
-                            var ObjToObj = {"_from": obj._key, "_to":loop(data[key], line)};
-                            if(typeof ObjToObj._to != 'undefined'){
-                                arango_edge.push(ObjToObj);
-                            }
-                        }else{
-                            if(key != "$$hashKey"){
-                                obj[key] = data[key];
-                            }
-                        }
-                    }
-                    
-                    if(data !== null){
-                        obj['label'] = "";
-                        
-                        if(typeof obj.prefix != 'undefined'){
-                            obj.label = obj.label + obj.prefix + " ";
-                        }
-                        
-                        if(typeof obj.value != 'undefined'){
-                            obj.label = obj.label + obj.value;
-                        }
-                        
-                        if(typeof obj.propertyName != 'undefined'){
-                            obj.label = obj.label + ": " + obj.propertyName;
-                        }    
-                        
-                        //handle prefix mapping of keys here.....
-                        
-                        if(obj.__type !== "Property"){
-                            
-                            if(obj.value !== undefined){
-                                obj['namespace+id'] += obj.value.toString();
-                                obj['old_key'] = obj._key;
-                                obj._key = obj["namespace+id"].hashCode().toString();
-                                
-                                for(var i = 0; i < arango_edge.length; i++){
-                                    if(arango_edge[i]._from === obj.old_key){
-                                        arango_edge[i]._from = obj._key;
-                                    }else if(arango_edge[i]._to === obj.old_key){
-                                        arango_edge[i]._to = obj._key;
-                                    }
-                                    
-                                }
-                            }
-                            
-                            if(obj.namespace !== undefined){
-                                arango_edge.push({"_from":obj.namespace.hashCode().toString(), "_to":obj._key});
-                            }
-                        }
-                        
-                        //End prefix handling of keys
-                        var existsInSet = false;
-                        
-                        for (key in arango_value){
-                            if(arango_value[key]._key === obj._key){
-                                existsInSet = true;
-                                break;
-                            }
-                        }
-                        
-                        if(!existsInSet){
-                            arango_value.push(obj);
-                        }
-                    }
-                    
-                    return obj._key;
-                };
-            
+            }else{
                 var rootNode = {"_key":count.toString(), "label": "Start node", "value": "Start node"};
                 count ++;
-                
-                for(var i = 1; i < row.data[0].length; i++){
-                //for(var i = 1; i < 3; i++){
-                    arango_edge.push({"_from": 0, "_to":(count).toString()});
-                    obKey = loop(mapping, row.data[0][i]);
-                    //console.log("Row: " + i + " ObKey: " + obKey + " Count: " + count);
-                }
-            };
+                arango_edge.push({"_from": 0, "_to":(count).toString()});
+                obKey = map(mapping, line.data[0]);
+    
+                arango_value.push(rootNode);
+            }
+        });
+    
+        lineReader.on('close', function(){
+            console.log("Done!");
+    
+            /*Add all namespaces to node collection*/
+            for(key in arango_value2){
+                arango_value.push(arango_value2[key]);
+            }
+    
+            //Save as array with objects
+            //write_array(arango_value, arango_edge);
+        
+            //Save one object per line
+            write_object(arango_value, arango_edge);
 
-            lineReader.on('close', function(){
-                console.log("Done!");
-                console.log(arango_value_done);
-                /*Add all namespaces to node collection*/
-                for(key in arango_value2){
-                    arango_value_done.push(arango_value2[key]);
-                }
-                //console.log(arango_value_done)
-                //Save as array with objects
-                //write_array(arango_value, arango_edge);
-            
-                //Save one object per line
-                write_object(arango_value_done, arango_edge_done);
-            });
+            res.send('ok');
         });
     });
 };
