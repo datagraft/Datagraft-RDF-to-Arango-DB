@@ -8,6 +8,7 @@ const multer  = require('multer');
 const pa = require('./papaparse.min.js');
 const fs = require('fs');
 const rl = require('readline');
+const rest = require('./REST.js');
 
 const request = require('request');
 
@@ -26,27 +27,36 @@ const upload = multer({ storage: storage });
 const cpUpload = upload.fields([{ name: 'csv', maxCount: 1 }, { name: 'mapping', maxCount: 1 }, { name: 'vocabulary', maxCount: 1 }]);
 
 module.exports = (app) => {
-    
+
     app.post('/', cpUpload, (req, res) => {
+        console.log(req.body);
       
         const showAndLogError = (res, status, message, data) => {
-    // If the headers are already sent, it probably means the server has started to
-    // provide a message and it's better to just keep the same message instead of
-    // crashing trying to send already sent headers
-    if (!res.headersSent) {
-      res.status(status).json({
-        error: message,
-        data
-      });
-    }
-
-    logging.error(message, data);
-  };
+          // If the headers are already sent, it probably means the server has started to
+          // provide a message and it's better to just keep the same message instead of
+          // crashing trying to send already sent headers
+          if (!res.headersSent) {
+            res.status(status).json({
+              error: message,
+              data
+            });
+          }
+      
+          logging.error(message, data);
+        };
     
-        var mapping =   JSON.parse(fs.readFileSync(req.files.mapping[0].path).toString());
-        var vocabulary = JSON.parse(fs.readFileSync(req.files.vocabulary[0].path).toString()); 
-        var csv = req.files.csv[0];
-        var path = req.files.csv[0].path;
+        const mapping =   JSON.parse(fs.readFileSync(req.files.mapping[0].path).toString());
+        const vocabulary = JSON.parse(fs.readFileSync(req.files.vocabulary[0].path).toString()); 
+        const csv = req.files.csv[0];
+        const path = req.files.csv[0].path;
+
+        //Params for REST calls
+        const useRest = req.body.REST;
+        const endpoint = req.body.endpoint;
+        const db = req.body.db;
+        const name = req.body.name;
+        const split = req.body.split;
+        const authToken = req.body.authToken;
         
         if (!mapping) {
           showAndLogError(res, 400, 'The RDF mapping is missing');
@@ -62,6 +72,68 @@ module.exports = (app) => {
           showAndLogError(res, 400, 'The source csv is missing');
           return;
         }
+
+        if(useRest) {
+            
+
+            if(!endpoint) {
+                showAndLogError(res, 400, 'Missing endpoint path');
+                return;
+            }
+
+            if(!db) {
+                showAndLogError(res, 400, 'Missing db name');
+                return;
+            }
+
+            if(!name) {
+                showAndLogError(res, 400, 'Missing a name for the dataset / transformation');
+                return;
+            }
+
+            rest.listCollections('', db, endpoint, authToken)
+                .then(result => {
+                    console.log(result)
+                    run();
+                })
+                .catch(reason => {
+                    //We didn't have the collection try to create them
+                    console.log(reason);
+
+                    var creColl = false;
+                    var creEdge = false;
+
+                    //create the collection
+                    rest.createCollection(name, db, endpoint, authToken)
+                        .then(result => {
+                            console.log(result)
+                            creColl = true;
+                            if(creColl && creEdge){
+                                creColl = false;
+                                creEdge = false;
+                                run();
+                            }
+                        })
+                        .catch(result => showAndLogError(res, 500, 'could not create collection')); 
+
+                    //create the edge collection
+                    rest.createCollection(name+"_edge", "3", db, endpoint, authToken)
+                        .then(result => {
+                            console.log(result)
+                            creEdge = true;
+                            if(creColl && creEdge){
+                                creColl = false;
+                                creEdge = false;
+                                run();
+                            }
+                        })
+                        .catch(result => showAndLogError(res, 500, 'could not create edge collection'));    
+                });
+        }else{
+            run();
+        }
+
+        function run(){
     
         var vocab = [];
         var headings = {};
@@ -88,8 +160,7 @@ module.exports = (app) => {
             
             //var stamp = new Date().toISOString().replace('T', ' ').replace('.', '')
             var stamp = Date.now();
-            fs.writeFile("results/" + stamp + "_arango_value.json", JSON.stringify(arangoValue), function(err) {
-                
+            fs.writeFile("results/" + stamp + "_arango_value.json", JSON.stringify(arangoValue), function(err){
                 if(err) {
                     return console.log(err);
                 }
@@ -322,7 +393,23 @@ module.exports = (app) => {
             //Save one object per line
             write_object(arango_value, arango_edge);
 
+            //rest.listCollections();
+            
+/*            for(elem in arango_value){
+                console.log(JSON.stringify(arango_value[elem]));
+                rest.insertDocument(JSON.stringify(arango_value[elem]), "infrarisk");
+            }
+*/
+            //console.log(JSON.stringify(arango_value))
+            if(useRest){
+                rest.insertDocument(JSON.stringify(arango_value), name, db, endpoint, authToken)
+                    .then(console.log("Inserted nodes to collection: " + collection))
+                    .catch(res => console.log(res));
+                rest.insertDocument(JSON.stringify(arango_edge), name+"_edge", db, end, authToken)
+                    .then(res => console.log('inserted edges to edge collection: '+name+"_edge"))
+                    .catch(res => console.log(res));
+            }
             res.send('ok');
         });
-    });
+    }});
 };

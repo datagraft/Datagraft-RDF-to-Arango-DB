@@ -1,29 +1,46 @@
 const $ = require('jquery');
-
-/*The URL path to the database*/
-const connection = '';
-
-/*The auth key for DC/OS*/
-const authToken = ``;
+var request = require("request");
 
 /*Get document
 * id = collectionName/_key
 * [optional] database = databasename [default is _system]
 */
-function getDocument(id, database = '_system'){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + database + "/_api/document/" + id,
-    "method": "GET",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.getDocument = function(id, database = '_system', endpoint, authToken){
+
+  var options = 
+  { 
+    method: 'GET',
+    url: endpoint + "_db/" +  database + "/_api/document/" + id,
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
-    },
-    "processData": false
-  }).done(function (response) {
-    console.log(response);
+    }
+  };
+
+  //console.log(options);
+  
+  return new Promise((resolve, reject) => {
+    request(options, function(error, response, body){
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      body = JSON.parse(body);
+      error = body.error;
+
+      console.log(error);
+
+      if (error){
+        console.log(error);
+        reject(error);
+      }
+      
+      //console.log(body);
+      resolve(body);
+    });
   });
 };
 
@@ -31,23 +48,102 @@ function getDocument(id, database = '_system'){
 * body = json object to be inserted
 * [optional] database = databasename [default is _system]
 */
-function insertDocument(body, database = '_system'){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + database + "/_api/document/" + id,
-    "method": "POST",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.insertDocument = function (body, collection, database = '_system', endpoint, authToken) {
+  
+  
+  var options = 
+  { 
+    method: 'POST',
+    url: endpoint + "_db/" +  database + "/_api/document/" + collection + "/",
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    "processData": false,
-    "data" : body
-  }).done(function (response) {
-    console.log(response);
+    body: body
+  };
+
+  //console.log(options);
+  
+  return new Promise((resolve, reject) => {
+    request(options, function(error, response, body){
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      body = JSON.parse(body);
+      error = body.error;
+
+      console.log(error);
+
+      if (error){
+        console.log(error);
+        reject(error);
+      }
+      
+      //console.log(body);
+      resolve(body);
+    });
   });
 };
+
+/* Make grapgh
+*  body = json object containing at least
+* 
+*/
+module.exports.graph = function (graphName, edgeCollection, collectionArray, database = '_system', endpoint, authToken){
+  
+    var options = 
+    { 
+      method: 'POST',
+      url: endpoint + "_db" + database + "/_api/cursor/",
+      headers: {
+        "authorization": authToken,
+        "content-type": "application/json",
+        "cache-control": "no-cache",
+      },
+      "data": 
+      {
+        "name": graphName,
+        "edgeDefinitions": [
+          {
+            "collection": edgeCollection,
+            "from": collectionArray,
+            "to": collectionArray,
+          }
+        ]
+      }
+    };
+  
+    return new Promise((resolve, reject) => {
+      
+      request(options, function (error, response, body) {
+  
+        console.log(response.statusCode);
+  
+        if(error){
+          console.log(error);
+          throw new Error(error);
+        }
+  
+        console.log(body);
+        body = JSON.parse(body);
+        error = body.error;
+        
+        if (error) {
+          console.log(body);
+          reject(body.errorMessage);
+          //throw new Error(error);
+        }
+        console.log(typeof body);
+        console.log(body.error);
+        console.log(body.code);
+        resolve(body);
+      })
+    });
+  };
 
 /* query the database
 *  body = json object containing at least
@@ -64,21 +160,45 @@ function insertDocument(body, database = '_system'){
 *  [optional] database = databasename [default is _system]
 * 
 */
-function query(body, database = '_system'){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + database + "_api/cursor/",
-    "method": "POST",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.query = function (body, database = '_system', endpoint, authToken){
+
+  var options = 
+  { 
+    method: 'POST',
+    url: endpoint + "_db" + database + "/_api/cursor/",
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    "processData": false,
-    "data" : body
-  }).done(function (response) {
-    console.log(response);
+    "data": body
+  };
+
+  return new Promise((resolve, reject) => {
+    
+    request(options, function (error, response, body) {
+
+      console.log(response.statusCode);
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      console.log(body);
+      body = JSON.parse(body);
+      error = body.error;
+      
+      if (error) {
+        console.log(body);
+        reject(body.errorMessage);
+        //throw new Error(error);
+      }
+      console.log(typeof body);
+      console.log(body.error);
+      console.log(body.code);
+      resolve(body);
+    })
   });
 };
 
@@ -88,20 +208,42 @@ function query(body, database = '_system'){
 * [optional] database = databasename [default is _system]
 *
 */
-function getNextBatch(id, database = '_system'){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + database + "_api/cursor/" + id,
-    "method": "PUT",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.getNext = function (id, database = '_system', endpoint, authToken){
+
+  var options = 
+  { 
+    method: 'PUT',
+    url: endpoint + "_db/" +  database + "_api/cursor/" + id,
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
-    },
-    "processData": false,
-  }).done(function (response) {
-    console.log(response);
+    }
+  };
+
+  //console.log(options);
+  
+  return new Promise((resolve, reject) => {
+    request(options, function(error, response, body){
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      body = JSON.parse(body);
+      error = body.error;
+
+      console.log(error);
+
+      if (error){
+        console.log(error);
+        reject(error);
+      }
+      
+      //console.log(body);
+      resolve(body);
+    });
   });
 };
 
@@ -111,22 +253,44 @@ function getNextBatch(id, database = '_system'){
 *
 * [optional] database = databasename [default is _system]
 */
-function explain(body, database = '_system'){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + database + "_api/explain/",
-    "method": "POST",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.explain = function(body, database = '_system', endpoint, authToken){
+  var options = 
+  { 
+    method: 'POST',
+    url: endpoint + "_db/" +  database + "_api/explain/",
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    "processData": false,
-    "data": body//"{ \n\t\"query\" : \"FOR b IN buildings FILTER b.prefix == \\\"Building\\\" RETURN b\",\n\t\"count\" : true, \n\t\"batchSize\" : 2\n\t}"
-  }).done(function (response) {
-    console.log(response);
+    "data": body
+  };
+
+  //console.log(options);
+  
+  return new Promise((resolve, reject) => {
+    request(options, function(error, response, body){
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      body = JSON.parse(body);
+      error = body.error;
+
+      console.log(error);
+
+      if (error){
+        console.log(error);
+        reject(error);
+      }
+      
+      //console.log(body);
+      resolve(body);
+    });
   });
+  
 };
 
 /*Create collection
@@ -135,101 +299,227 @@ function explain(body, database = '_system'){
 *
 * [optional] database = databasename [default is _system]
 */
-function createCollection(body, database = '_system'){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + database + "/_api/collection/",
-    "method": "POST",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.createCollection = function (collection, type = '',database = '_system', endpoint, authToken){
+
+  console.log("create collection");
+
+  var options =
+  {
+    method: 'POST',
+    url: endpoint + "_db/" + database + "/_api/collection/",
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    "processData": false,
-    "data": body//"{ \n\t\"query\" : \"FOR b IN buildings FILTER b.prefix == \\\"Building\\\" RETURN b\",\n\t\"count\" : true, \n\t\"batchSize\" : 2\n\t}"
-  }).done(function (response) {
-    console.log(response);
+    body: JSON.stringify({"name": collection, "type": type})
+  };
+
+  return new Promise((resolve, reject) => {
+    request(options, function(error, response, body){
+      console.log(body);
+
+      body = JSON.parse(body);
+      
+      console.log(body);
+      
+      error = body.error;
+
+      if (error){
+        console.log(body);
+        reject(body.errorMessage);
+      }
+      
+      resolve(body);
+    });
   });
 };
 
 /*List collections
 * [optional] database = databasename [default is _system]
 */
-function listCollections(database = '_system'){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + database + "/_api/collection/",
-    "method": "GET",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.listCollections = function (collection = '', database = '_system', endpoint, authToken) {
+
+  var options = 
+  { 
+    method: 'GET',
+    url: endpoint + "_db/" + database + "/_api/collection/" + collection,
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    "processData": false
-  }).done(function (response) {
-    console.log(response);
+    body: ""
+  };
+
+  console.log(options);
+
+  var error = null;
+  var code = 200;
+  
+  return new Promise((resolve, reject) => {
+    
+    request(options, function (error, response, body) {
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      if(response.statusCode > 400){
+        console.log(response.statusCode + " - " + response.statusMessage);
+        throw new Error(response.statusCode);
+      }
+
+      console.log(body);
+      body = JSON.parse(body);
+      error = body.error;
+      
+      if (error) {
+        console.log(body);
+        reject(body.errorMessage);
+        //throw new Error(error);
+      }
+      console.log(typeof body);
+      console.log(body.error);
+      console.log(body.code);
+
+      error = body.error;
+      code = body.code;
+
+      resolve(body);
+    })
   });
 };
 
 /*List database*/
-function listDatabases(){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + "_api/database/",
-    "method": "GET",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.listDatabases = function(endpoint, authToken){
+  var options = 
+  { 
+    method: 'GET',
+    url: endpoint + "/_api/database/",
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
-    },
-    "processData": false
-  }).done(function (response) {
-    console.log(response);
+    }
+  };
+  
+  return new Promise((resolve, reject) => {
+    
+    request(options, function (error, response, body) {
+
+      console.log(response.statusCode);
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      console.log(body);
+      body = JSON.parse(body);
+      error = body.error;
+      
+      if (error) {
+        console.log(body);
+        reject(body.errorMessage);
+        //throw new Error(error);
+      }
+      console.log(typeof body);
+      console.log(body.error);
+      console.log(body.code);
+      resolve(body);
+    })
   });
+
+  
 };
 
 /*Create database
 * body = a JSON object with at least the key 'name' with the name of the DB to create
 */
-function createDatabase(body){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + "_api/database/",
-    "method": "POST",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.createDatabase = function(body, endpoint, authToken){
+  var options = 
+  { 
+    method: 'POST',
+    url: endpoint + "/_api/database/",
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    "processData": false,
-    "data": body//"{ \n\t\"query\" : \"FOR b IN buildings FILTER b.prefix == \\\"Building\\\" RETURN b\",\n\t\"count\" : true, \n\t\"batchSize\" : 2\n\t}"
-  }).done(function (response) {
-    console.log(response);
+    "data": body
+  };
+
+  return new Promise((resolve, reject) => {
+    
+    request(options, function (error, response, body) {
+
+      console.log(response.statusCode);
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      console.log(body);
+      body = JSON.parse(body);
+      error = body.error;
+      
+      if (error) {
+        console.log(body);
+        reject(body.errorMessage);
+        //throw new Error(error);
+      }
+      console.log(typeof body);
+      console.log(body.error);
+      console.log(body.code);
+      resolve(body);
+    })
   });
 };
 
 
 /*delete database
-* body = a JSON object with the key 'name' with the name of the DB to delete.
+* db = Name of the db to delete
 */
-function deleteDatabase(body){
-  $.ajax({
-    "async": true,
-    "crossDomain": true,
-    "url": connection + "_api/database/",
-    "method": "POST",
-    "headers": {
-      "authorization": "token=" + authToken,
+module.exports.deleteDatabase = function (db, endpoint, authToken){
+
+  var options = 
+  { 
+    method: 'DELETE',
+    url: endpoint + "/_api/database/" + db,
+    headers: {
+      "authorization": authToken,
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    "processData": false,
-    "data": body//"{ \n\t\"query\" : \"FOR b IN buildings FILTER b.prefix == \\\"Building\\\" RETURN b\",\n\t\"count\" : true, \n\t\"batchSize\" : 2\n\t}"
-  }).done(function (response) {
-    console.log(response);
+    "data": body
+  };
+
+  return new Promise((resolve, reject) => {
+    
+    request(options, function (error, response, body) {
+
+      console.log(response.statusCode);
+
+      if(error){
+        console.log(error);
+        throw new Error(error);
+      }
+
+      console.log(body);
+      body = JSON.parse(body);
+      error = body.error;
+      
+      if (error) {
+        console.log(body);
+        reject(body.errorMessage);
+        //throw new Error(error);
+      }
+      console.log(typeof body);
+      console.log(body.error);
+      console.log(body.code);
+      resolve(body);
+    })
   });
 };
