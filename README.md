@@ -61,4 +61,4 @@ To import and make new collection
 ```docker exec -i arangodb arangoimp --file csvdocument.csv --type csv --collection test_csv --create-collection true```
 
 ## Test files
-There can be found a test CSV inside the folder `test/`
+There is one csv file located at `test/`
