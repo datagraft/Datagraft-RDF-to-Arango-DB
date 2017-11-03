@@ -21,6 +21,7 @@ csv: <csv file>
 REST: [true/false]
 
 /* If REST is set to true then these are required */
+
 endpoint: <The Arango instence URL>
 db: <The name for the database on arango to use>
 name: <The collection name, that the valuse should be inserted to>
