@@ -79,6 +79,7 @@ module.exports.insertDocument = function (body, collection, database = '_system'
       console.log(error);
 
       if (error){
+        console.log("INSERT ERROR!");
         console.log(error);
         reject(error);
       }
@@ -317,12 +318,8 @@ module.exports.createCollection = function (collection, type = '',database = '_s
 
   return new Promise((resolve, reject) => {
     request(options, function(error, response, body){
-      console.log(body);
-
       body = JSON.parse(body);
-      
       console.log(body);
-      
       error = body.error;
 
       if (error){
@@ -365,7 +362,7 @@ module.exports.listCollections = function (collection = '', database = '_system'
         throw new Error(error);
       }
 
-      if(response.statusCode > 400){
+      if(response.statusCode > 400 && response.statusCode != 404){
         console.log(response.statusCode + " - " + response.statusMessage);
         throw new Error(response.statusCode);
       }

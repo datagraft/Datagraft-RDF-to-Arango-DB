@@ -10,7 +10,7 @@ var cors = require('cors')
 const request = require('request');
 
 
-const serverPort = process.env.HTTP_PORT || 8089;
+const serverPort = process.env.HTTP_PORT || 3030;
 
 const app = express();
 
@@ -23,5 +23,5 @@ app.get('/', (req, res) => {
 require('./transformscript')(app);
 
 app.listen(serverPort, () => {
-  logging.info('Datagraft-RDF-to-Arago-DB started on http://localhost:' + serverPort + '/');
+  logging.info('Datagraft-CSV-to-Arago-DB started on http://localhost:' + serverPort + '/');
 });
