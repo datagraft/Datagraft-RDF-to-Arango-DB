@@ -58,7 +58,7 @@ typings/
 .env
 
 # dont save transformed json files - this are enormus.
-results/
+result/
 
 # Uploaded files
 uploads/
