@@ -2,11 +2,13 @@
 A node script to transform datagraft RDF mappings to Arango DB values. But this branch takes a CSV and maps each line to a object that can be imported into Arango DB
 
 ## The service
-All you need to do to run this service is clone this branch and run these two commands:
+All you need to do to run this service is clone this branch and run these four commands:
 
 ```
-1: npm install
-2: npm run 
+1: mkdir uploads
+2: mkdir result
+3: npm install
+4: npm run 
 ```
 
 This will expose the service on port `3030`
