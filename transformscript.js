@@ -91,7 +91,7 @@ module.exports = (app) => {
                 return;
             }
 
-            rest.listCollections('', db, endpoint, authToken)
+            rest.listCollections(name, db, endpoint, authToken)
                 .then(result => {
                     console.log(result)
                     run();
@@ -114,7 +114,7 @@ module.exports = (app) => {
                                 run();
                             }
                         })
-                        .catch(result => showAndLogError(res, 500, 'could not create collection')); 
+                        .catch(result => {showAndLogError(res, 500, 'could not create collection'); console.log("could not make normal collection")}); 
 
                     //create the edge collection
                     rest.createCollection(name+"_edge", "3", db, endpoint, authToken)
@@ -127,8 +127,8 @@ module.exports = (app) => {
                                 run();
                             }
                         })
-                        .catch(result => showAndLogError(res, 500, 'could not create edge collection'));    
-                });
+                        .catch(result => {showAndLogError(res, 500, 'could not create collection'); console.log("could not make edge collection")}); 
+                    });
         }else{
             run();
         }
@@ -403,9 +403,9 @@ module.exports = (app) => {
             //console.log(JSON.stringify(arango_value))
             if(useRest){
                 rest.insertDocument(JSON.stringify(arango_value), name, db, endpoint, authToken)
-                    .then(console.log("Inserted nodes to collection: " + collection))
+                    .then(console.log("Inserted nodes to collection: " + name))
                     .catch(res => console.log(res));
-                rest.insertDocument(JSON.stringify(arango_edge), name+"_edge", db, end, authToken)
+                rest.insertDocument(JSON.stringify(arango_edge), name+"_edge", db, endpoint, authToken)
                     .then(res => console.log('inserted edges to edge collection: '+name+"_edge"))
                     .catch(res => console.log(res));
             }

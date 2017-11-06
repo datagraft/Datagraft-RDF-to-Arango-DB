@@ -76,7 +76,7 @@ module.exports.insertDocument = function (body, collection, database = '_system'
       body = JSON.parse(body);
       error = body.error;
 
-      console.log(error);
+      console.log("Error: "+error+ "body: "+JSON.stringify(body));
 
       if (error){
         console.log(error);
@@ -365,7 +365,7 @@ module.exports.listCollections = function (collection = '', database = '_system'
         throw new Error(error);
       }
 
-      if(response.statusCode > 400){
+      if(response.statusCode > 400 && response.statusCode != 404){
         console.log(response.statusCode + " - " + response.statusMessage);
         throw new Error(response.statusCode);
       }
