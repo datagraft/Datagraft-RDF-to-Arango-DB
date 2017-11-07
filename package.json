@@ -4,7 +4,9 @@
   "description": "A script to transfrom csv to datagraft rdf structure for saving in arangodb",
   "main": "datalib.min.js",
   "dependencies": {
-    "filereader": "^0.10.3"
+    "datalib": "^1.8.0",
+    "filereader": "^0.10.3",
+    "minimist": "^1.2.0"
   },
   "devDependencies": {},
   "scripts": {
