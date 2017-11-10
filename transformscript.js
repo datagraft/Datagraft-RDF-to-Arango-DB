@@ -14,7 +14,7 @@ var vocab = [],
     graph_mapping = {},
     lineCounter = 0;
 
-/* Hash function - used to hash namespaces for keys*/
+/* Hash function - used to hash namespaces for keys */
 String.prototype.hashCode = function () {
   var hash = 0;
   if (this.length === 0) return hash;
@@ -27,57 +27,7 @@ String.prototype.hashCode = function () {
 };
 
 /* Read function of the csv file */
-function read(input) {
-  var createdHeadings = false;
-  // reset headings
-  headings = []; 
 
-  // empty the output files
-  fs.truncateSync("./results/" + stamp + "_arango_edge.json", 0);
-  fs.truncateSync("./results/" + stamp + "_arango_value.json", 0);
-
-  // Edge collection must be an array so we add the opening bracket before we start adding the individual edges
-  fs.appendFileSync("./results/" + stamp + "_arango_edge.json", '[');
-
-  var lineReader = require('readline').createInterface({
-    input: fs.createReadStream(input)
-  });
-
-  lineReader.on('line', function (line) {
-    var arango_value = [],
-        arango_edge = [];
-
-    line = pa.parse(line);
-    ++lineCounter;
-//    console.log("Line: " + lineCounter);
-
-    if(!createdHeadings) {
-      createdHeadings = true;
-      for (var i = 0; i < line.data[0].length; i++) { //for all elements i colums array from datalib parse
-        var value = line.data[0][i];
-        headings[value] = i; //add an entry with value as key and arrayposition as value
-      }
-    } else {
-      var rootNode = {"_key":count.toString(), "label": "Start node", "value": "Start node"};
-      count ++;
-
-      arango_edge.push({"_from": 0, "_to":(count).toString()});
-      obKey = mapAsync(graph_mapping, line.data[0], arango_value, arango_edge);
-
-      arango_value.push(rootNode);
-
-      write_object(arango_value, arango_edge);
-    }
-  });
-
-  lineReader.on('close', function(){
-    console.log("Done!");
-    console.timeEnd("transformData");
-    console.log("Lines: " + lineCounter);
-    // // Edge collection must be an array so we add the closing bracket after we are done reading input
-    fs.appendFileSync("./results/" + stamp + "_arango_edge.json", '{}]');
-  });
-}
 
 function mapAsync(data, line, arango_value, arango_edge){            
   var obj = {};
@@ -205,35 +155,101 @@ function mapAsync(data, line, arango_value, arango_edge){
   return obj._key;
 }
 
-function write_array(arangoValue, arangoEdge){
-  console.log("array!");
-  var stamp = new Date().toISOString().replace('T', ' ').replace('.', '');
-
-  fs.writeFile("./results/" + stamp + "_arango_value.json", JSON.stringify(arangoValue), function(err) {
-    if(err) {
-      return console.log(err);
-    }
-  });
-
-  fs.writeFile("./results/" + stamp + "_arango_edge.json", JSON.stringify(arangoEdge), function(err) {
-    if(err) {
-      return console.log(err);
-    }
-  });
-}
-
 // output file name without the file extension
 var stamp = (args.file || args.f).substring(0, (args.file || args.f).lastIndexOf('.'));
+
+var arangoValuesFilePath = "./results/" + stamp + "_arango_value.json";
+var arangoEdgeFilePath = "./results/" + stamp + "_arango_edge.json";
+
+// Open write streams to the files for the value and edge collections
+var wsValues = fs.createWriteStream(arangoValuesFilePath);
+var wsEdges = fs.createWriteStream(arangoEdgeFilePath);
+
+
+
+// empty the output files if they exist
+if(fs.existsSync(arangoValuesFilePath)){
+  fs.truncateSync(arangoValuesFilePath, 0);
+}
+if(fs.existsSync(arangoEdgeFilePath)){
+  fs.truncateSync(arangoEdgeFilePath, 0);
+}
+
+// Initialise files
+fs.appendFileSync(arangoValuesFilePath, '');
+// Edge collection must be an array so we add the opening bracket before we start adding the individual edges
+fs.appendFileSync(arangoEdgeFilePath, '[');
+
+
+
+function read(input) {
+  var createdHeadings = false;
+  // reset headings
+  headings = []; 
+
+  var lineReader = require('readline').createInterface({
+    input: fs.createReadStream(input)
+  });
+
+  lineReader.on('line', function (line) {
+    var arango_value = [],
+        arango_edge = [];
+    var lineBak = line;
+    line = pa.parse(line);
+    ++lineCounter;
+    //    console.log("Line: " + lineCounter);
+
+    if(!createdHeadings) {
+      createdHeadings = true;
+      for (var i = 0; i < line.data[0].length; i++) { //for all elements i colums array from datalib parse
+        var value = line.data[0][i];
+        headings[value] = i; //add an entry with value as key and arrayposition as value
+      }
+    } else {
+      var rootNode = {"_key":count.toString(), "label": "Start node", "value": "Start node"};
+      count ++;
+
+      if(!line.data[0]){
+        // Apparently sometimes there are random empty lines in the input files...
+        console.log("Empty or corrupted line found - ignoring ...");
+        console.log(line);
+        console.log("Line text: ");
+        console.log(lineBak);
+      } else {
+        arango_edge.push({"_from": 0, "_to":(count).toString()});
+        obKey = mapAsync(graph_mapping, line.data[0], arango_value, arango_edge);
+        arango_value.push(rootNode);
+        write_object(arango_value, arango_edge);
+      }
+    }
+  });
+
+  lineReader.on('close', function(){
+    console.log("Done!");
+    console.timeEnd("transformData");
+    console.log("Lines: " + lineCounter);
+
+    // Edge collection must be an array so we add the closing bracket after we are done reading input
+    wsEdges.write(']');
+
+    // Close streams
+    wsValues.end();
+    wsEdges.end();
+    //    fs.appendFileSync("./results/" + stamp + "_arango_edge.json", '{}]');
+  });
+}
 
 function write_object(arangoValue, arangoEdge){
   // Write nodes
   for(var i = 0; i < arangoValue.length; i++){
-    fs.appendFileSync("./results/" + stamp + "_arango_value.json", JSON.stringify(arangoValue[i]) + '\n'); 
+    wsValues.write(JSON.stringify(arangoValue[i]) + '\n');
+    //    fs.appendFileSync("./results/" + stamp + "_arango_value.json", JSON.stringify(arangoValue[i]) + '\n'); 
   }
 
   // Write edges
   for(i = 0; i < arangoEdge.length; i++){
-    fs.appendFileSync("./results/" + stamp + "_arango_edge.json", JSON.stringify(arangoEdge[i]) + ',\n'); 
+    wsEdges.write(JSON.stringify(arangoEdge[i]) + ',\n');
+    //    fs.appendFileSync("./results/" + stamp + "_arango_edge.json", JSON.stringify(arangoEdge[i]) + ',\n'); 
   }
 }
 
