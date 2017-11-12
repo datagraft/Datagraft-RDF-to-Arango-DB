@@ -60,11 +60,12 @@ function mapAsync(data, line, arango_value, arango_edge){
         //console.log(arango_value2);
       }
 
-      obj['namespace+id'] = vocab[data[key]].namespace;                
+      obj['namespace+id'] = vocab[data[key]].namespace;              
     }
 
     if(key === 'constant' || key === "propertyName"){
-      obj['namespace+id'] += data[key];                
+      obj['namespace+id'] += data[key];
+      obj['value'] = data[key];                
     }
 
     if(key === "column" || key === "literalValue"){
@@ -73,7 +74,7 @@ function mapAsync(data, line, arango_value, arango_edge){
       var val = line[field];
 
       obj[key] = data[key].value;
-      obj.value = line[field];
+      obj['value'] = line[field];
 
       if(!isNaN(obj.value)){
         obj.value = +obj.value;
@@ -178,7 +179,7 @@ if(fs.existsSync(arangoEdgeFilePath)){
 // Initialise files
 fs.appendFileSync(arangoValuesFilePath, '');
 // Edge collection must be an array so we add the opening bracket before we start adding the individual edges
-fs.appendFileSync(arangoEdgeFilePath, '[');
+fs.appendFileSync(arangoEdgeFilePath, '');
 
 
 
@@ -230,7 +231,9 @@ function read(input) {
     console.log("Lines: " + lineCounter);
 
     // Edge collection must be an array so we add the closing bracket after we are done reading input
-    wsEdges.write(']');
+    //wsEdges.write(']');
+
+    write_object(arango_value2, []);
 
     // Close streams
     wsValues.end();
@@ -248,7 +251,7 @@ function write_object(arangoValue, arangoEdge){
 
   // Write edges
   for(i = 0; i < arangoEdge.length; i++){
-    wsEdges.write(JSON.stringify(arangoEdge[i]) + ',\n');
+    wsEdges.write(JSON.stringify(arangoEdge[i]) + '\n');
     //    fs.appendFileSync("./results/" + stamp + "_arango_edge.json", JSON.stringify(arangoEdge[i]) + ',\n'); 
   }
 }
