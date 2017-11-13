@@ -67,8 +67,8 @@ function mapAsync(data, line, arango_value, arango_edge){
       obj['namespace+id'] += data[key];
       obj['value'] = data[key];                
     }
-
     if(key === "column" || key === "literalValue"){
+
       var test = data[key].value;
       var field = headings[test];
       var val = line[field];
@@ -167,11 +167,11 @@ var wsValues = fs.createWriteStream(arangoValuesFilePath);
 var wsEdges = fs.createWriteStream(arangoEdgeFilePath);
 
 
-
 // empty the output files if they exist
 if(fs.existsSync(arangoValuesFilePath)){
   fs.truncateSync(arangoValuesFilePath, 0);
 }
+
 if(fs.existsSync(arangoEdgeFilePath)){
   fs.truncateSync(arangoEdgeFilePath, 0);
 }
@@ -189,10 +189,12 @@ function read(input) {
   headings = []; 
 
   var lineReader = require('readline').createInterface({
+    terminal: false,
     input: fs.createReadStream(input)
   });
 
   lineReader.on('line', function (line) {
+    //console.log(arango_value2);    
     var arango_value = [],
         arango_edge = [];
     var lineBak = line;
