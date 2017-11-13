@@ -228,14 +228,14 @@ function read(input) {
   });
 
   lineReader.on('close', function(){
+    console.log(arango_value2);
+    write_object(arango_value2, []);
+    
     console.log("Done!");
     console.timeEnd("transformData");
     console.log("Lines: " + lineCounter);
-
     // Edge collection must be an array so we add the closing bracket after we are done reading input
     //wsEdges.write(']');
-
-    write_object(arango_value2, []);
 
     // Close streams
     wsValues.end();
