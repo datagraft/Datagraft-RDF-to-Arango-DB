@@ -12,7 +12,9 @@ var vocab = [],
     args = require('minimist')(process.argv.slice(2)),
     transformation_vocabs = [],
     graph_mapping = {},
-    lineCounter = 0;
+    lineCounter = 0,
+    constants ={};
+
 
 /* Hash function - used to hash namespaces for keys */
 String.prototype.hashCode = function () {
@@ -34,57 +36,56 @@ function mapAsync(data, line, arango_value, arango_edge){
 
   if(data !== null){
     obj = {"_key":count.toString()};
-    obj['namespace+id'] = "";
-    //console.log(obj._key);
+    obj['rdf'] = "";
     count ++;
   }
 
+  //for all elements inside the dataobject
   for(key in data){
     if(key === "prefix"){
       obj.namespace = vocab[data[key]].namespace;
 
       var nameHash = obj.namespace.hashCode().toString();
-      var isThere = false;
+      var setContainsPrefix = false;
 
       if(arango_value2.length !== 0){
         for(var key2 in arango_value2){
-          if(key2 == nameHash){
-            isThere = true;
+          if(key2 === nameHash){
+            setContainsPrefix = true;
           }
         }
       }
 
-      if(!isThere && nameHash !== undefined){
-        arango_value2[nameHash] = {"_key": nameHash, "label": obj.namespace};
+      if(!setContainsPrefix && nameHash !== undefined){
+        arango_value2[nameHash] = {"_key": nameHash, "rdf": obj.namespace};
         arango_edge.push({"_from": 0, "_to": nameHash});
-        //console.log(arango_value2);
       }
 
-      obj['namespace+id'] = vocab[data[key]].namespace;              
+      obj['rdf'] = vocab[data[key]].namespace;              
     }
 
     if(key === 'constant' || key === "propertyName"){
-      obj['namespace+id'] += data[key];
+      obj['rdf'] += data[key];
       obj['value'] = data[key];                
     }
+    
     if(key === "column" || key === "literalValue"){
-
-      var test = data[key].value;
-      var field = headings[test];
-      var val = line[field];
-
-      obj[key] = data[key].value;
+      var field = headings[data[key].value];
+      //obj[key] = data[key].value; //This is the line for adding column and litteralValue to the node
       obj['value'] = line[field];
-
-      if(!isNaN(obj.value)){
-        obj.value = +obj.value;
-      }   
+      
+      !isNaN(obj.value) ? obj.value = +obj.value : '';
+      
+      obj.value !== undefined ? obj.rdf += obj.value.toString():'';
 
     }else if(Array.isArray(data[key])){
       data[key].forEach(function(entry) {
-        var ArrToObj = {"_from": obj._key, "_to":mapAsync(entry, line, arango_value, arango_edge)};
-        if(typeof ArrToObj._to != 'undefined'){
-          arango_edge.push(ArrToObj);
+        //Ignore Condition nodes
+        if(entry.__type !== "Condition"){
+          var ArrToObj = {"_from": obj._key, "_to":mapAsync(entry, line, arango_value, arango_edge)};
+          if(typeof ArrToObj._to != 'undefined'){
+            arango_edge.push(ArrToObj);
+          }
         }
       });
     }else if(typeof data[key] === 'object'){
@@ -93,66 +94,65 @@ function mapAsync(data, line, arango_value, arango_edge){
         arango_edge.push(ObjToObj);
       }
     }else{
-      if(key != "$$hashKey"){
+      /*
+        Things / keys to ignore and not include in the finished transformation.
+      */
+      if(key != "$$hashKey" && key != "constant" && key != "propertyName" && key != "langTag" && key != "datatypeURI"){
         obj[key] = data[key];
       }
     }
   } 
 
   if(data !== null){
-    obj.label = "";
-
-    if(typeof obj.prefix != 'undefined'){
-      obj.label = obj.label + obj.prefix + " ";
-    }
-
-    if(typeof obj.value != 'undefined'){
-      obj.label = obj.label + obj.value;
-    }
-
-    if(typeof obj.propertyName != 'undefined'){
-      obj.label = obj.label + ": " + obj.propertyName;
-    }    
-
-    //handle prefix mapping of keys here.....
-
     if(obj.__type !== "Property"){
-
       if(obj.value !== undefined){
-        obj['namespace+id'] += obj.value.toString();
-        obj.old_key = obj._key;
-        obj._key = obj["namespace+id"].hashCode().toString();
+        //keep the old key so we can update it
+        var old_key = obj._key;
+    
+        //make a new key based on the hash of the RDF URI
+        obj._key = obj['rdf'].hashCode().toString();
 
+        // For all elements reffering to the old key, swap with the new key
         for(var i = 0; i < arango_edge.length; i++){
-          if(arango_edge[i]._from === obj.old_key){
+          if(arango_edge[i]._from === old_key){
             arango_edge[i]._from = obj._key;
-          }else if(arango_edge[i]._to === obj.old_key){
+          }else if(arango_edge[i]._to === old_key){
             arango_edge[i]._to = obj._key;
           }
 
         }
       }
 
-      if(obj.namespace !== undefined){
-        arango_edge.push({"_from":obj.namespace.hashCode().toString(), "_to":obj._key});
-      }
+      //if we have the namespace, add a connection from the node to the namespace itself
+      obj.namespace !== undefined ? arango_edge.push({"_from":obj.namespace.hashCode().toString(), "_to":obj._key}) : '';
     }
-
-    //End prefix handling of keys
+    
+    //Check if this node already exists
     var existsInSet = false;
-
     for (key in arango_value){
       if(arango_value[key]._key === obj._key){
         existsInSet = true;
         break;
       }
     }
-
-    if(!existsInSet){
-      arango_value.push(obj);
+    
+    //Keep track of constants so that we don't add them more often than we need.
+    if(obj.__type === 'ConstantURI' || obj.__type === 'ConstantLiteral'){
+      if(constants[obj._key] !== undefined){
+        existsInSet = true;
+      }else{
+        constants[obj._key] = obj;
+      }
     }
-  }
 
+    //If it doesen't exist add it to the set.
+    !existsInSet ? arango_value.push(obj) : '';
+  }
+  
+  //Remove values we don't want to have
+  delete obj.__type;
+  delete obj.namespace;
+  
   return obj._key;
 }
 
@@ -193,6 +193,8 @@ function read(input) {
     input: fs.createReadStream(input)
   });
 
+  console.log("starting transformation");
+
   lineReader.on('line', function (line) {
     //console.log(arango_value2);    
     var arango_value = [],
@@ -229,8 +231,7 @@ function read(input) {
 
   lineReader.on('close', function(){
     console.log(arango_value2);
-    fs.appendFileSync(arangoValuesFilePath, arango_value2);
-    
+    fs.appendFileSync(arangoValuesFilePath, arango_value2);    
     console.log("Done!");
     console.timeEnd("transformData");
     console.log("Lines: " + lineCounter);
