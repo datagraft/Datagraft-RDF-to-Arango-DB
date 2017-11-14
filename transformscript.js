@@ -157,7 +157,7 @@ function mapAsync(data, line, arango_value, arango_edge){
 }
 
 // output file name without the file extension
-var stamp = (args.file || args.f).substring(0, (args.file || args.f).lastIndexOf('.'));
+var stamp = (args.file || args.f).substring((args.file || args.f).lastIndexOf('/') === -1 ? 0 : (args.file || args.f).lastIndexOf('/') + 1, (args.file || args.f).lastIndexOf('.'));
 
 var arangoValuesFilePath = "./results/" + stamp + "_arango_value.json";
 var arangoEdgeFilePath = "./results/" + stamp + "_arango_edge.json";
@@ -218,7 +218,7 @@ function read(input) {
         // Apparently sometimes there are random empty lines in the input files...
         console.log("Empty or corrupted line found - ignoring ...");
         console.log(line);
-        console.log("Line text: ");
+        console.log("Line number: " + lineCounter + ". Line text: ");
         console.log(lineBak);
       } else {
         arango_edge.push({"_from": 0, "_to":(count).toString()});
