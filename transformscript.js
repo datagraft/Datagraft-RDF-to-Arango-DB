@@ -229,7 +229,7 @@ function read(input) {
 
   lineReader.on('close', function(){
     console.log(arango_value2);
-    write_object(arango_value2, []);
+    fs.appendFileSync(arangoValuesFilePath, arango_value2);
     
     console.log("Done!");
     console.timeEnd("transformData");
