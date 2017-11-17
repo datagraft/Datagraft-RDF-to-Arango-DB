@@ -4,16 +4,19 @@ const dl = require('datalib');
 const fs = require('fs');
 
 /* Containers for transformation data */
-var vocab = [],
+var vocabularyMapping = [],
     headings = {},
     buffer,
-    count = 0,
-    arango_value2 = {},
+    countToBeRemoved = 0,
+    arangoPrefixes = {},
     args = require('minimist')(process.argv.slice(2)),
     transformation_vocabs = [],
     graph_mapping = {},
     lineCounter = 0,
-    constants ={};
+    constants = {},
+    mappedUriNodes = [],
+    valuesNotFoundWarning = false,
+    incompleteMappingWarning = false;
 
 
 /* Hash function - used to hash namespaces for keys */
@@ -31,129 +34,283 @@ String.prototype.hashCode = function () {
 /* Read function of the csv file */
 
 
-function mapAsync(data, line, arango_value, arango_edge){            
-  var obj = {};
+function addPrefixMapping(prefix, arangoEdges) {
+  var namespace = vocabularyMapping[prefix].namespace;
 
-  if(data !== null){
-    obj = {"_key":count.toString()};
-    obj['rdf'] = "";
-    count ++;
+  var nameHash = namespace.hashCode().toString();
+  var alreadyMappedPrefix = false;
+  for(var pref in arangoPrefixes){
+    if (pref === nameHash) {
+      alreadyMappedPrefix = true;
+    }
   }
 
-  //for all elements inside the dataobject
-  for(key in data){
-    if(key === "prefix"){
-      obj.namespace = vocab[data[key]].namespace;
+  if (!alreadyMappedPrefix && nameHash !== undefined){
+    arangoPrefixes[nameHash] = {
+      _key: nameHash, 
+      namespaceURI: namespace,
+      prefix: prefix,
+      type: 'Prefix'
+    };
+  }
 
-      var nameHash = obj.namespace.hashCode().toString();
-      var setContainsPrefix = false;
+}
 
-      if(arango_value2.length !== 0){
-        for(var key2 in arango_value2){
-          if(key2 === nameHash){
-            setContainsPrefix = true;
-          }
+function isSameUriNode(uriNode1, uriNode2, line) {
+  if (uriNode1.__type === uriNode2.__type) {
+    // Compare the fully qualified names
+    switch (uriNode1.__type) {
+      case 'ColumnURI':
+        var columnValue1 = line[headings[uriNode1.column.value]];
+        var columnValue2 = line[headings[uriNode2.column.value]];
+        // If fully qualified names are the same - the nodes are the same
+        if (vocabularyMapping[uriNode1.prefix].namespace + columnValue1 ===  vocabularyMapping[uriNode2.prefix].namespace + columnValue2) {
+          return true;
+        } else {
+          return false;
         }
-      }
-
-      if(!setContainsPrefix && nameHash !== undefined){
-        arango_value2[nameHash] = {"_key": nameHash, "rdf": obj.namespace};
-        arango_edge.push({"_from": 0, "_to": nameHash});
-      }
-
-      obj['rdf'] = vocab[data[key]].namespace;              
-    }
-
-    if(key === 'constant' || key === "propertyName"){
-      obj['rdf'] += data[key];
-      obj['value'] = data[key];                
-    }
-    
-    if(key === "column" || key === "literalValue"){
-      var field = headings[data[key].value];
-      //obj[key] = data[key].value; //This is the line for adding column and litteralValue to the node
-      obj['value'] = line[field];
-      
-      !isNaN(obj.value) ? obj.value = +obj.value : '';
-      
-      obj.value !== undefined ? obj.rdf += obj.value.toString():'';
-
-    }else if(Array.isArray(data[key])){
-      data[key].forEach(function(entry) {
-        //Ignore Condition nodes
-        if(entry.__type !== "Condition"){
-          var ArrToObj = {"_from": obj._key, "_to":mapAsync(entry, line, arango_value, arango_edge)};
-          if(typeof ArrToObj._to != 'undefined'){
-            arango_edge.push(ArrToObj);
-          }
-        }
-      });
-    }else if(typeof data[key] === 'object'){
-      var ObjToObj = {"_from": obj._key, "_to":mapAsync(data[key], line, arango_value, arango_edge)};
-      if(typeof ObjToObj._to != 'undefined'){
-        arango_edge.push(ObjToObj);
-      }
-    }else{
-      /*
-        Things / keys to ignore and not include in the finished transformation.
-      */
-      if(key != "$$hashKey" && key != "constant" && key != "propertyName" && key != "langTag" && key != "datatypeURI"){
-        obj[key] = data[key];
-      }
-    }
-  } 
-
-  if(data !== null){
-    if(obj.__type !== "Property"){
-      if(obj.value !== undefined){
-        //keep the old key so we can update it
-        var old_key = obj._key;
-    
-        //make a new key based on the hash of the RDF URI
-        obj._key = obj['rdf'].hashCode().toString();
-
-        // For all elements reffering to the old key, swap with the new key
-        for(var i = 0; i < arango_edge.length; i++){
-          if(arango_edge[i]._from === old_key){
-            arango_edge[i]._from = obj._key;
-          }else if(arango_edge[i]._to === old_key){
-            arango_edge[i]._to = obj._key;
-          }
-
-        }
-      }
-
-      //if we have the namespace, add a connection from the node to the namespace itself
-      obj.namespace !== undefined ? arango_edge.push({"_from":obj.namespace.hashCode().toString(), "_to":obj._key}) : '';
-    }
-    
-    //Check if this node already exists
-    var existsInSet = false;
-    for (key in arango_value){
-      if(arango_value[key]._key === obj._key){
-        existsInSet = true;
         break;
+      case 'ConstantURI':
+        var constantValue1 = uriNode1.constant;
+        var constantValue2 = uriNode2.constant;
+        if (vocabularyMapping[uriNode1.prefix].namespace + constantValue1 === vocabularyMapping[uriNode2.prefix].namespace + constantValue2) {
+          return true;
+        } else {
+          return false;
+        }
+        break;
+      default:
+        // Neither is a URI node
+        return false;
+        break;
+    }
+  } else {
+    return false;
+  }
+
+  return false;
+}
+
+function mapProperty(property, rootMapping, graphMapping, line, arangoValues, arangoEdges) {
+  if(property.prefix) {
+    // TODO - we may be adding prefixes that are not referenced here! This is because we do not have literal properties as nodes themselves
+    addPrefixMapping(property.prefix, arangoEdges);
+  }
+  /*
+
+   All literal objects in the RDF mapping will be mapped to JSON object attributes; 
+   All rdf:type property values in the RDF mapping will be stored as 'type' attributes; 
+   All rdfs:label property values will be stored as 'label' attributes;
+
+  */
+  switch (vocabularyMapping[property.prefix].namespace + property.propertyName) {
+    case 'http://www.w3.org/2000/01/rdf-schema#label':
+      var labelNode = property.subElements[0];
+      if (labelNode.__type === 'ColumnLiteral') {
+        // The label of the node mapping is mapped to the value of the column
+        rootMapping.label = line[headings[labelNode.literalValue.value]];
+      } else if (labelNode.__type === 'ConstantLiteral') {
+        // The label of the node mapping is just a free-defined string
+        rootMapping.label = labelNode.literalValue.value;
+      } else {
+        // Invalid RDF mapping - ignore this (blank nodes or URI nodes should not be mapped as labels!)
+        console.log("WARNING: wrong RDF mapping - blank nodes or URI nodes should not be mapped to rdfs:label-s! Ignoring the label mapping...");
+      }
+      break;
+    case 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type':
+      var typeNode = property.subElements[0];
+      if (typeNode.__type === 'ColumnURI') {
+        // Add the prefix to the prefix mapping and add the qualified name as value to the type attribute in the resulting object
+        if(typeNode.prefix) {
+          addPrefixMapping(typeNode.prefix, arangoEdges);
+        }
+        // Add type attribute to the root mapping - [prefix]:Type
+        rootMapping.type.push((typeNode.prefix ? typeNode.prefix + ':' : '') + line[headings[typeNode.column.value]]);
+      } else if (typeNode.__type === 'ConstantURI') {
+        // Add the prefix to the prefix mapping and add the qualified name as value to the type attribute in the resulting object
+        if(typeNode.prefix) {
+          addPrefixMapping(typeNode.prefix, arangoEdges);
+        }
+        // Type mapped to either <prefix>:<value> or just <value> if no prefix defined
+        rootMapping.type = (typeNode.prefix ? typeNode.prefix + ':' : '') + typeNode.constant;
+      } else {
+        // Invalid RDF mapping - ignore this (blank nodes or literal nodes should not be mapped as types!)
+        console.log("WARNING: wrong RDF mapping - blank nodes or literal nodes should not be mapped to rdf:type-s! Ignoring the type mapping...");
+      }
+      break;
+    default:
+      // All other literals will be added to the object; URI nodes will be added separately based on the graph mapping;
+      // first - check if the object is a URI node
+      switch (property.subElements[0].__type) {
+        case 'ConstantURI':
+        case 'ColumnURI':
+          var uriObject = property.subElements[0];
+          var foundUriNodeNotYetMapped = false;
+          var comparedRoot = {};
+
+          // Go through the root nodes in the mapping
+          for(var j = 0; j < graphMapping.graphRoots.length; ++j) {
+            comparedRoot = graphMapping.graphRoots[j];
+            // We search for URI nodes in the roots that are mapped to the same URI 
+            if(isSameUriNode(uriObject, comparedRoot, line) && !comparedRoot.mappingToArango) {
+              foundUriNodeNotYetMapped = true;
+              break;
+            }
+          }
+          var uriObjectMapping = {};
+
+          // If the URI node has not yet been mapped - map it in order to get the ID to add antry to the Edge collection.
+          // The entry connects the currently mapped root to the matched node that was just mapped.
+          if (foundUriNodeNotYetMapped) {
+            uriObjectMapping = mapURINode(comparedRoot, graphMapping, line, arangoValues, arangoEdges);
+          } else {
+            // Need to create a new node and a link in the edge collection
+            uriObjectMapping = mapURINode(uriObject, graphMapping, line, arangoValues, arangoEdges);
+          }
+          arangoEdges.push({
+            "_from": rootMapping._key, 
+            "_to": uriObjectMapping._key
+          });
+          // mappedIsolatedUriNodes
+
+          // Constant URI nodes could be isolated nodes - we would like to avoid adding them more than once to the arango mapping
+
+          break;
+        case 'BlankNode':
+          //          debugger;
+          // Blank nodes mapped to objects in the resulting root mapping object- should be only literals + maybe type!
+          // We only map 1-level-depth blank node descriptions (<Graph root node> -> <Property> -> <Blank node> -> <Properties [1..x]> -> <Literal values/Types [1..x]>)
+          break;
+        default:
+          // Literals are mapped to attributes to the new objects; the attribute names are taken from the RDF mapping
+          var attributeMappingName = (property.prefix ? property.prefix + ':' : '') + property.propertyName;
+          if(property.subElements[0].__type == 'ConstantLiteral') {
+            var attributeMappingValue = property.subElements[0].literalValue;
+          } else if (property.subElements[0].__type == 'ColumnLiteral') {
+            var attributeMappingValue = line[headings[property.subElements[0].literalValue.value]];
+          } else {
+            // Should not be possible
+            console.log('WARNING: unexpected mapping type found: ' + property.subElements[0].__type);
+          }
+          rootMapping[attributeMappingName] = attributeMappingValue;
+          break;
+      }
+      break;
+
+  }
+}
+
+function checkRdfMapped(currValue) {
+  return this.rdf === currValue.rdf;
+}
+
+// Recursive function that maps a line according to graph roots definition in a graph mapping and adds the result 
+// to the collections for ArangoDB values and edges
+function mapURINode(uriNode, graphMapping, line, arangoValues, arangoEdges) {
+  uriNode.mappingToArango = true;
+  var uriNodeMapping = {
+    type: []
+  };
+
+  if (uriNode.__type === 'ColumnURI' || uriNode.__type === 'ConstantURI') {
+    // URI root - continue as planned
+    if (uriNode.__type === 'ColumnURI') {
+      // Get column value from the line
+      var columnValue = line[headings[uriNode.column.value]];
+      if(!columnValue) {
+        if(!valuesNotFoundWarning){
+          console.log('WARNING: Some of the column values were not found for the provided mapping!');
+          valuesNotFoundWarning = true;
+        }
+      } else {
+        uriNodeMapping.value = columnValue;
+        // Add the prefix if it is available and the RDF value
+        if(uriNode.prefix) {
+          uriNodeMapping.prefix = uriNode.prefix;
+          addPrefixMapping(uriNode.prefix, arangoEdges);
+          // RDF value is the fully qualified name (URI of prefix and column value together)
+          uriNodeMapping.rdf = vocabularyMapping[uriNode.prefix].namespace + columnValue;
+        } else {
+          // Value should be a full URI - just add the column value
+          uriNodeMapping.rdf = columnValue;
+        }
+      }
+    } else if (uriNode.__type === 'ConstantURI') {
+      var constantValue = uriNode.constant;
+      if(!constantValue) {
+        if(!valuesNotFoundWarning){
+          console.log('WARNING: Some of the column values were not found for the provided mapping!');
+          valuesNotFoundWarning = true;
+        }
+      } else {
+        uriNodeMapping.value = constantValue;
+        // Add the prefix if it is available and the RDF value
+        if(uriNode.prefix) {
+          uriNodeMapping.prefix = uriNode.prefix;
+          addPrefixMapping(uriNode.prefix, arangoEdges);
+          // RDF value is the fully qualified name (URI of prefix and column value together)
+          uriNodeMapping.rdf = vocabularyMapping[uriNode.prefix].namespace + constantValue;
+        } else {
+          // Value should be a full URI - just add the column value
+          uriNodeMapping.rdf = constantValue;
+        }
       }
     }
-    
-    //Keep track of constants so that we don't add them more often than we need.
-    if(obj.__type === 'ConstantURI' || obj.__type === 'ConstantLiteral'){
-      if(constants[obj._key] !== undefined){
-        existsInSet = true;
-      }else{
-        constants[obj._key] = obj;
+    // If we did not manage to specify the rdf of a URI node, that means that there were probably missing information
+    // in the input data; such URI nodes should be ignored
+    if(uriNodeMapping.rdf) {
+      // Add the mapping of the root to the Arango values if we already mapped this URI node
+      var previousUriNodeMapping = mappedUriNodes.find(checkRdfMapped, uriNodeMapping);
+      if(!previousUriNodeMapping) {
+        // Assign the key to the URI node mapping based on the unique RDF identifier hashcode
+        uriNodeMapping._key = uriNodeMapping.rdf.hashCode().toString();
+        arangoValues.push(uriNodeMapping);
+        mappedUriNodes.push(uriNodeMapping);
+      } else {
+        uriNodeMapping = previousUriNodeMapping;
+      }
+    } else {
+      if(!incompleteMappingWarning) {
+        incompleteMappingWarning = true;
+        console.log("WARNING: incomplete mapping for object detected!");
       }
     }
 
-    //If it doesen't exist add it to the set.
-    !existsInSet ? arango_value.push(obj) : '';
+    // Go through the properties of the graph root
+    for(var i = 0; i < uriNode.subElements.length; ++i) {
+      mapProperty(uriNode.subElements[i], uriNodeMapping, graphMapping, line, arangoValues, arangoEdges);
+    }
+
+  } else {
+    // Literal root node - strange, but OK!
+
+    // give it an ID
+    // add to the collection of stuff to add to arango
   }
-  
-  //Remove values we don't want to have
-  delete obj.__type;
-  delete obj.namespace;
-  
-  return obj._key;
+
+
+
+  // delete the root being mapped from the mapping
+
+  // return the mapping key - may be needed for the edge collection
+  return uriNodeMapping;
+}
+
+function mapAsyncFlat(graphMapping, line, arangoValues, arangoEdges) {
+  // URI nodes are documents
+  // All literals are attributes (except label, which is "label")
+  // Type also added as "type"
+  for (i = 0; i < graphMapping.graphRoots.length; ++i) {
+    var graphRoot = graphMapping.graphRoots[i];
+    // If we have not yet mapped the root, mark the node and map it
+    if(!graphMapping.graphRoots[i].mappingToArango) {
+      mapURINode(graphRoot, graphMapping, line, arangoValues, arangoEdges);
+    }
+  }
+  // Reset the graph mapping object
+  for (i = 0; i < graphMapping.graphRoots.length; ++i) {
+    graphMapping.graphRoots[i].mappingToArango = false;
+  }
 }
 
 // output file name without the file extension
@@ -211,8 +368,8 @@ function read(input) {
         headings[value] = i; //add an entry with value as key and arrayposition as value
       }
     } else {
-      var rootNode = {"_key":count.toString(), "label": "Start node", "value": "Start node"};
-      count ++;
+      //      var rootNode = {"_key":count.toString(), "label": "Start node", "value": "Start node"};
+      countToBeRemoved ++;
 
       if(!line.data[0]){
         // Apparently sometimes there are random empty lines in the input files...
@@ -221,17 +378,25 @@ function read(input) {
         console.log("Line number: " + lineCounter + ". Line text: ");
         console.log(lineBak);
       } else {
-        arango_edge.push({"_from": 0, "_to":(count).toString()});
-        obKey = mapAsync(graph_mapping, line.data[0], arango_value, arango_edge);
-        arango_value.push(rootNode);
+        //        arango_edge.push({"_from": 0, "_to":(count).toString()});
+        mapAsyncFlat(graph_mapping, line.data[0], arango_value, arango_edge);
+        //        arango_value.push(rootNode);
+        //        debugger;
         write_object(arango_value, arango_edge);
       }
     }
   });
 
   lineReader.on('close', function(){
-    console.log(arango_value2);
-    fs.appendFileSync(arangoValuesFilePath, arango_value2);    
+    console.log(arangoPrefixes);
+
+    for (var key in arangoPrefixes) {
+      if (arangoPrefixes.hasOwnProperty(key)) {
+        fs.appendFileSync(arangoValuesFilePath, JSON.stringify(arangoPrefixes[key]) + '\n');
+      }
+    }
+
+
     console.log("Done!");
     console.timeEnd("transformData");
     console.log("Lines: " + lineCounter);
@@ -266,9 +431,9 @@ try {
     graph_mapping = transformation.extra.graphs[0];
     /* Make vocabs for dataset */
     for(var i = 0; i < transformation_vocabs.length; i++) {
-      if(i === 0){ vocab = []; }
+      if(i === 0){ vocabularyMapping = []; }
       var key = transformation_vocabs[i].name;
-      vocab[key] = transformation_vocabs[i];
+      vocabularyMapping[key] = transformation_vocabs[i];
     }
   } else {
     throw ("Transformation argument not found.")
