@@ -14,9 +14,9 @@ var vocabularyMapping = [],
     graph_mapping = {},
     lineCounter = 0,
     constants = {},
-    mappedUriNodes = [],
     valuesNotFoundWarning = false,
-    incompleteMappingWarning = false;
+    incompleteMappingWarning = false,
+    mappedUriNodesMap = new Map();
 
 
 /* Hash function - used to hash namespaces for keys */
@@ -168,7 +168,7 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
             // Need to create a new node and a link in the edge collection
             uriObjectMapping = mapURINode(uriObject, graphMapping, line, arangoValues, arangoEdges);
           }
-          
+
           arangoEdges.push({
             "_from": rootMapping._key, 
             "_to": uriObjectMapping._key,
@@ -199,10 +199,6 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
       break;
 
   }
-}
-
-function checkRdfMapped(currValue) {
-  return this.rdf === currValue.rdf;
 }
 
 // Recursive function that maps a line according to graph roots definition in a graph mapping and adds the result 
@@ -262,15 +258,11 @@ function mapURINode(uriNode, graphMapping, line, arangoValues, arangoEdges) {
     // in the input data; such URI nodes should be ignored
     if(uriNodeMapping.rdf) {
       // Add the mapping of the root to the Arango values if we already mapped this URI node
-      var previousUriNodeMapping = mappedUriNodes.find(checkRdfMapped, uriNodeMapping);
-      if(!previousUriNodeMapping) {
-        // Assign the key to the URI node mapping based on the unique RDF identifier hashcode
+      if(!mappedUriNodesMap.has(uriNodeMapping.rdf.hashCode().toString())) {
         uriNodeMapping._key = uriNodeMapping.rdf.hashCode().toString();
         arangoValues.push(uriNodeMapping);
-        mappedUriNodes.push(uriNodeMapping);
-      } else {
-        uriNodeMapping = previousUriNodeMapping;
-      }
+        mappedUriNodesMap.set(uriNodeMapping._key, true);
+      } 
     } else {
       if(!incompleteMappingWarning) {
         incompleteMappingWarning = true;
