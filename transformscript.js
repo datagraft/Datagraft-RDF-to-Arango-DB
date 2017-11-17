@@ -103,7 +103,7 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
    All rdfs:label property values will be stored as 'label' attributes;
 
   */
-  switch (vocabularyMapping[property.prefix].namespace + property.propertyName) {
+  switch (property.prefix ? (vocabularyMapping[property.prefix].namespace + property.propertyName) : property.propertyName) {
     case 'http://www.w3.org/2000/01/rdf-schema#label':
       var labelNode = property.subElements[0];
       if (labelNode.__type === 'ColumnLiteral') {
@@ -124,15 +124,16 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
         if(typeNode.prefix) {
           addPrefixMapping(typeNode.prefix, arangoEdges);
         }
-        // Add type attribute to the root mapping - [prefix]:Type
-        rootMapping.type.push((typeNode.prefix ? typeNode.prefix + ':' : '') + line[headings[typeNode.column.value]]);
+        // Add type attribute to the root mapping - fully qualified URI (http://...#<prefix_name>)
+        rootMapping.type.push((typeNode.prefix ? vocabularyMapping[property.prefix].namespace : '') 
+                              + line[headings[typeNode.column.value]]);
       } else if (typeNode.__type === 'ConstantURI') {
         // Add the prefix to the prefix mapping and add the qualified name as value to the type attribute in the resulting object
         if(typeNode.prefix) {
           addPrefixMapping(typeNode.prefix, arangoEdges);
         }
         // Type mapped to either <prefix>:<value> or just <value> if no prefix defined
-        rootMapping.type = (typeNode.prefix ? typeNode.prefix + ':' : '') + typeNode.constant;
+        rootMapping.type.push((typeNode.prefix ? vocabularyMapping[property.prefix].namespace : '') + typeNode.constant);
       } else {
         // Invalid RDF mapping - ignore this (blank nodes or literal nodes should not be mapped as types!)
         console.log("WARNING: wrong RDF mapping - blank nodes or literal nodes should not be mapped to rdf:type-s! Ignoring the type mapping...");
@@ -167,17 +168,17 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
             // Need to create a new node and a link in the edge collection
             uriObjectMapping = mapURINode(uriObject, graphMapping, line, arangoValues, arangoEdges);
           }
+          
           arangoEdges.push({
             "_from": rootMapping._key, 
-            "_to": uriObjectMapping._key
+            "_to": uriObjectMapping._key,
+            rdf: property.prefix ? (vocabularyMapping[property.prefix].namespace + property.propertyName) : property.propertyName
           });
-          // mappedIsolatedUriNodes
 
           // Constant URI nodes could be isolated nodes - we would like to avoid adding them more than once to the arango mapping
 
           break;
         case 'BlankNode':
-          //          debugger;
           // Blank nodes mapped to objects in the resulting root mapping object- should be only literals + maybe type!
           // We only map 1-level-depth blank node descriptions (<Graph root node> -> <Property> -> <Blank node> -> <Properties [1..x]> -> <Literal values/Types [1..x]>)
           break;
@@ -207,6 +208,7 @@ function checkRdfMapped(currValue) {
 // Recursive function that maps a line according to graph roots definition in a graph mapping and adds the result 
 // to the collections for ArangoDB values and edges
 function mapURINode(uriNode, graphMapping, line, arangoValues, arangoEdges) {
+  var blankNodeCounter = 0;
   uriNode.mappingToArango = true;
   var uriNodeMapping = {
     type: []
