@@ -168,7 +168,6 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
             // Need to create a new node and a link in the edge collection
             uriObjectMapping = mapURINode(uriObject, graphMapping, line, arangoValues, arangoEdges);
           }
-
           arangoEdges.push({
             "_from": rootMapping._key, 
             "_to": uriObjectMapping._key,
@@ -259,10 +258,10 @@ function mapURINode(uriNode, graphMapping, line, arangoValues, arangoEdges) {
     if(uriNodeMapping.rdf) {
       // Add the mapping of the root to the Arango values if we already mapped this URI node
       if(!mappedUriNodesMap.has(uriNodeMapping.rdf.hashCode().toString())) {
-        uriNodeMapping._key = uriNodeMapping.rdf.hashCode().toString();
         arangoValues.push(uriNodeMapping);
         mappedUriNodesMap.set(uriNodeMapping._key, true);
       } 
+      uriNodeMapping._key = uriNodeMapping.rdf.hashCode().toString();
     } else {
       if(!incompleteMappingWarning) {
         incompleteMappingWarning = true;
@@ -372,10 +371,7 @@ function read(input) {
         console.log("Line number: " + lineCounter + ". Line text: ");
         console.log(lineBak);
       } else {
-        //        arango_edge.push({"_from": 0, "_to":(count).toString()});
         mapAsyncFlat(graph_mapping, line.data[0], arango_value, arango_edge);
-        //        arango_value.push(rootNode);
-        //        debugger;
         write_object(arango_value, arango_edge);
       }
     }
