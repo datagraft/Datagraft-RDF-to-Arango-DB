@@ -125,7 +125,7 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
           addPrefixMapping(typeNode.prefix, arangoEdges);
         }
         // Add type attribute to the root mapping - fully qualified URI (http://...#<prefix_name>)
-        rootMapping.type.push((typeNode.prefix ? vocabularyMapping[property.prefix].namespace : '') 
+        rootMapping.type.push((typeNode.prefix ? vocabularyMapping[typeNode.prefix].namespace : '') 
                               + line[headings[typeNode.column.value]]);
       } else if (typeNode.__type === 'ConstantURI') {
         // Add the prefix to the prefix mapping and add the qualified name as value to the type attribute in the resulting object
@@ -133,7 +133,7 @@ function mapProperty(property, rootMapping, graphMapping, line, arangoValues, ar
           addPrefixMapping(typeNode.prefix, arangoEdges);
         }
         // Type mapped to either <prefix>:<value> or just <value> if no prefix defined
-        rootMapping.type.push((typeNode.prefix ? vocabularyMapping[property.prefix].namespace : '') + typeNode.constant);
+        rootMapping.type.push((typeNode.prefix ? vocabularyMapping[typeNode.prefix].namespace : '') + typeNode.constant);
       } else {
         // Invalid RDF mapping - ignore this (blank nodes or literal nodes should not be mapped as types!)
         console.log("WARNING: wrong RDF mapping - blank nodes or literal nodes should not be mapped to rdf:type-s! Ignoring the type mapping...");
