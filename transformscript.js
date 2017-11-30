@@ -259,7 +259,7 @@ function mapURINode(uriNode, graphMapping, line, arangoValues, arangoEdges) {
       // Add the mapping of the root to the Arango values if we already mapped this URI node
       if(!mappedUriNodesMap.has(uriNodeMapping.rdf.hashCode().toString())) {
         arangoValues.push(uriNodeMapping);
-        mappedUriNodesMap.set(uriNodeMapping._key, true);
+        mappedUriNodesMap.set(uriNodeMapping.rdf.hashCode().toString(), true);
       } 
       uriNodeMapping._key = uriNodeMapping.rdf.hashCode().toString();
     } else {
