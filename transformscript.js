@@ -449,7 +449,7 @@ module.exports = (app, settings) => {
   }
 
 
-  app.post('/', cpUpload, (req, res) => {
+  app.post('/arango_transform/zip', cpUpload, (req, res) => {
     // console.log(req.body);
     incompleteMappingWarning = false,
       valuesNotFoundWarning = false,
