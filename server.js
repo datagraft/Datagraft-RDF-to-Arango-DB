@@ -3,6 +3,7 @@
  */
 
 var express = require('express')
+var zip = require('express-zip');
 var cors = require('cors')
     const logging = require('./logging');
 //require('./transformscript');

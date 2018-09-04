@@ -409,7 +409,11 @@ module.exports = (app, settings) => {
       wsValues.end();
       wsEdges.end();
 
-      response_object.send('ok');
+      response_object.zip([
+        { path: arangoValuesFilePath, name: 'arango_values.json' },
+        { path: arangoEdgeFilePath, name: 'arango_edges.json' }
+      ], "arango_transformed.zip");
+
     });
 
     // writer function. Writes on arango object per line, and
@@ -448,7 +452,9 @@ module.exports = (app, settings) => {
   app.post('/', cpUpload, (req, res) => {
     // console.log(req.body);
     incompleteMappingWarning = false,
-      valuesNotFoundWarning = false;
+      valuesNotFoundWarning = false,
+      mappedUriNodesMap = new Map(),
+      vocabularyMapping = [];
 
     // generate resulting file name based on current time
     stamp = Date.now();
