@@ -5,12 +5,11 @@ var request = require("request");
 * id = collectionName/_key
 * [optional] database = databasename [default is _system]
 */
-module.exports.getDocument = function(id, database = '_system', endpoint, authToken){
-
-  var options = 
-  { 
+module.exports.getDocument = function (id, database = '_system', endpoint, authToken) {
+  var options =
+  {
     method: 'GET',
-    url: endpoint + "_db/" +  database + "/_api/document/" + id,
+    url: endpoint + "_db/" + database + "/_api/document/" + id,
     headers: {
       "authorization": authToken,
       "content-type": "application/json",
@@ -19,11 +18,11 @@ module.exports.getDocument = function(id, database = '_system', endpoint, authTo
   };
 
   //console.log(options);
-  
-  return new Promise((resolve, reject) => {
-    request(options, function(error, response, body){
 
-      if(error){
+  return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -33,11 +32,11 @@ module.exports.getDocument = function(id, database = '_system', endpoint, authTo
 
       console.log(error);
 
-      if (error){
+      if (error) {
         console.log(error);
         reject(error);
       }
-      
+
       //console.log(body);
       resolve(body);
     });
@@ -49,12 +48,10 @@ module.exports.getDocument = function(id, database = '_system', endpoint, authTo
 * [optional] database = databasename [default is _system]
 */
 module.exports.insertDocument = function (body, collection, database = '_system', endpoint, authToken) {
-  
-  
-  var options = 
-  { 
+  var options =
+  {
     method: 'POST',
-    url: endpoint + "_db/" +  database + "/_api/document/" + collection + "/",
+    url: endpoint + "_db/" + database + "/_api/document/" + collection + "/",
     headers: {
       "authorization": authToken,
       "content-type": "application/json",
@@ -64,11 +61,11 @@ module.exports.insertDocument = function (body, collection, database = '_system'
   };
 
   //console.log(options);
-  
-  return new Promise((resolve, reject) => {
-    request(options, function(error, response, body){
 
-      if(error){
+  return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -78,12 +75,12 @@ module.exports.insertDocument = function (body, collection, database = '_system'
 
       console.log(error);
 
-      if (error){
+      if (error) {
         console.log("INSERT ERROR!");
         console.log(error);
         reject(error);
       }
-      
+
       //console.log(body);
       resolve(body);
     });
@@ -94,57 +91,52 @@ module.exports.insertDocument = function (body, collection, database = '_system'
 *  body = json object containing at least
 * 
 */
-module.exports.graph = function (graphName, edgeCollection, collectionArray, database = '_system', endpoint, authToken){
-  
-    var options = 
-    { 
-      method: 'POST',
-      url: endpoint + "_db" + database + "/_api/cursor/",
-      headers: {
-        "authorization": authToken,
-        "content-type": "application/json",
-        "cache-control": "no-cache",
-      },
-      "data": 
-      {
-        "name": graphName,
-        "edgeDefinitions": [
-          {
-            "collection": edgeCollection,
-            "from": collectionArray,
-            "to": collectionArray,
-          }
-        ]
-      }
-    };
-  
-    return new Promise((resolve, reject) => {
-      
-      request(options, function (error, response, body) {
-  
-        console.log(response.statusCode);
-  
-        if(error){
-          console.log(error);
-          throw new Error(error);
+module.exports.graph = function (graphName, edgeCollection, collectionArray, database = '_system', endpoint, authToken) {
+  var options = {
+    method: 'POST',
+    url: endpoint + "_db" + database + "/_api/cursor/",
+    headers: {
+      "authorization": authToken,
+      "content-type": "application/json",
+      "cache-control": "no-cache",
+    },
+    "data":
+    {
+      "name": graphName,
+      "edgeDefinitions": [
+        {
+          "collection": edgeCollection,
+          "from": collectionArray,
+          "to": collectionArray,
         }
-  
-        console.log(body);
-        body = JSON.parse(body);
-        error = body.error;
-        
-        if (error) {
-          console.log(body);
-          reject(body.errorMessage);
-          //throw new Error(error);
-        }
-        console.log(typeof body);
-        console.log(body.error);
-        console.log(body.code);
-        resolve(body);
-      })
-    });
+      ]
+    }
   };
+
+  return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+      console.log(response.statusCode);
+      if (error) {
+        console.log(error);
+        throw new Error(error);
+      }
+
+      console.log(body);
+      body = JSON.parse(body);
+      error = body.error;
+
+      if (error) {
+        console.log(body);
+        reject(body.errorMessage);
+        //throw new Error(error);
+      }
+      console.log(typeof body);
+      console.log(body.error);
+      console.log(body.code);
+      resolve(body);
+    })
+  });
+};
 
 /* query the database
 *  body = json object containing at least
@@ -161,10 +153,10 @@ module.exports.graph = function (graphName, edgeCollection, collectionArray, dat
 *  [optional] database = databasename [default is _system]
 * 
 */
-module.exports.query = function (body, database = '_system', endpoint, authToken){
+module.exports.query = function (body, database = '_system', endpoint, authToken) {
 
-  var options = 
-  { 
+  var options =
+  {
     method: 'POST',
     url: endpoint + "_db" + database + "/_api/cursor/",
     headers: {
@@ -176,12 +168,9 @@ module.exports.query = function (body, database = '_system', endpoint, authToken
   };
 
   return new Promise((resolve, reject) => {
-    
     request(options, function (error, response, body) {
-
       console.log(response.statusCode);
-
-      if(error){
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -189,7 +178,7 @@ module.exports.query = function (body, database = '_system', endpoint, authToken
       console.log(body);
       body = JSON.parse(body);
       error = body.error;
-      
+
       if (error) {
         console.log(body);
         reject(body.errorMessage);
@@ -209,12 +198,11 @@ module.exports.query = function (body, database = '_system', endpoint, authToken
 * [optional] database = databasename [default is _system]
 *
 */
-module.exports.getNext = function (id, database = '_system', endpoint, authToken){
-
-  var options = 
-  { 
+module.exports.getNext = function (id, database = '_system', endpoint, authToken) {
+  var options =
+  {
     method: 'PUT',
-    url: endpoint + "_db/" +  database + "_api/cursor/" + id,
+    url: endpoint + "_db/" + database + "_api/cursor/" + id,
     headers: {
       "authorization": authToken,
       "content-type": "application/json",
@@ -223,11 +211,11 @@ module.exports.getNext = function (id, database = '_system', endpoint, authToken
   };
 
   //console.log(options);
-  
-  return new Promise((resolve, reject) => {
-    request(options, function(error, response, body){
 
-      if(error){
+  return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -237,11 +225,11 @@ module.exports.getNext = function (id, database = '_system', endpoint, authToken
 
       console.log(error);
 
-      if (error){
+      if (error) {
         console.log(error);
         reject(error);
       }
-      
+
       //console.log(body);
       resolve(body);
     });
@@ -254,11 +242,11 @@ module.exports.getNext = function (id, database = '_system', endpoint, authToken
 *
 * [optional] database = databasename [default is _system]
 */
-module.exports.explain = function(body, database = '_system', endpoint, authToken){
-  var options = 
-  { 
+module.exports.explain = function (body, database = '_system', endpoint, authToken) {
+  var options =
+  {
     method: 'POST',
-    url: endpoint + "_db/" +  database + "_api/explain/",
+    url: endpoint + "_db/" + database + "_api/explain/",
     headers: {
       "authorization": authToken,
       "content-type": "application/json",
@@ -268,11 +256,11 @@ module.exports.explain = function(body, database = '_system', endpoint, authToke
   };
 
   //console.log(options);
-  
-  return new Promise((resolve, reject) => {
-    request(options, function(error, response, body){
 
-      if(error){
+  return new Promise((resolve, reject) => {
+    request(options, function (error, response, body) {
+
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -282,16 +270,16 @@ module.exports.explain = function(body, database = '_system', endpoint, authToke
 
       console.log(error);
 
-      if (error){
+      if (error) {
         console.log(error);
         reject(error);
       }
-      
+
       //console.log(body);
       resolve(body);
     });
   });
-  
+
 };
 
 /*Create collection
@@ -300,7 +288,7 @@ module.exports.explain = function(body, database = '_system', endpoint, authToke
 *
 * [optional] database = databasename [default is _system]
 */
-module.exports.createCollection = function (collection, type = '',database = '_system', endpoint, authToken){
+module.exports.createCollection = function (collection, type = '', database = '_system', endpoint, authToken) {
 
   console.log("create collection");
 
@@ -313,20 +301,20 @@ module.exports.createCollection = function (collection, type = '',database = '_s
       "content-type": "application/json",
       "cache-control": "no-cache",
     },
-    body: JSON.stringify({"name": collection, "type": type})
+    body: JSON.stringify({ "name": collection, "type": type })
   };
 
   return new Promise((resolve, reject) => {
-    request(options, function(error, response, body){
+    request(options, function (error, response, body) {
       body = JSON.parse(body);
       console.log(body);
       error = body.error;
 
-      if (error){
+      if (error) {
         console.log(body);
         reject(body.errorMessage);
       }
-      
+
       resolve(body);
     });
   });
@@ -337,8 +325,8 @@ module.exports.createCollection = function (collection, type = '',database = '_s
 */
 module.exports.listCollections = function (collection = '', database = '_system', endpoint, authToken) {
 
-  var options = 
-  { 
+  var options =
+  {
     method: 'GET',
     url: endpoint + "_db/" + database + "/_api/collection/" + collection,
     headers: {
@@ -353,16 +341,16 @@ module.exports.listCollections = function (collection = '', database = '_system'
 
   var error = null;
   var code = 200;
-  
+
   return new Promise((resolve, reject) => {
-    
+
     request(options, function (error, response, body) {
-      if(error){
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
 
-      if(response.statusCode > 400 && response.statusCode != 404){
+      if (response.statusCode > 400 && response.statusCode != 404) {
         console.log(response.statusCode + " - " + response.statusMessage);
         throw new Error(response.statusCode);
       }
@@ -370,7 +358,7 @@ module.exports.listCollections = function (collection = '', database = '_system'
       console.log(body);
       body = JSON.parse(body);
       error = body.error;
-      
+
       if (error) {
         console.log(body);
         reject(body.errorMessage);
@@ -389,9 +377,9 @@ module.exports.listCollections = function (collection = '', database = '_system'
 };
 
 /*List database*/
-module.exports.listDatabases = function(endpoint, authToken){
-  var options = 
-  { 
+module.exports.listDatabases = function (endpoint, authToken) {
+  var options =
+  {
     method: 'GET',
     url: endpoint + "/_api/database/",
     headers: {
@@ -400,14 +388,14 @@ module.exports.listDatabases = function(endpoint, authToken){
       "cache-control": "no-cache",
     }
   };
-  
+
   return new Promise((resolve, reject) => {
-    
+
     request(options, function (error, response, body) {
 
       console.log(response.statusCode);
 
-      if(error){
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -415,7 +403,7 @@ module.exports.listDatabases = function(endpoint, authToken){
       console.log(body);
       body = JSON.parse(body);
       error = body.error;
-      
+
       if (error) {
         console.log(body);
         reject(body.errorMessage);
@@ -428,15 +416,15 @@ module.exports.listDatabases = function(endpoint, authToken){
     })
   });
 
-  
+
 };
 
 /*Create database
 * body = a JSON object with at least the key 'name' with the name of the DB to create
 */
-module.exports.createDatabase = function(body, endpoint, authToken){
-  var options = 
-  { 
+module.exports.createDatabase = function (body, endpoint, authToken) {
+  var options =
+  {
     method: 'POST',
     url: endpoint + "/_api/database/",
     headers: {
@@ -448,12 +436,12 @@ module.exports.createDatabase = function(body, endpoint, authToken){
   };
 
   return new Promise((resolve, reject) => {
-    
+
     request(options, function (error, response, body) {
 
       console.log(response.statusCode);
 
-      if(error){
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -461,7 +449,7 @@ module.exports.createDatabase = function(body, endpoint, authToken){
       console.log(body);
       body = JSON.parse(body);
       error = body.error;
-      
+
       if (error) {
         console.log(body);
         reject(body.errorMessage);
@@ -479,10 +467,10 @@ module.exports.createDatabase = function(body, endpoint, authToken){
 /*delete database
 * db = Name of the db to delete
 */
-module.exports.deleteDatabase = function (db, endpoint, authToken){
+module.exports.deleteDatabase = function (db, endpoint, authToken) {
 
-  var options = 
-  { 
+  var options =
+  {
     method: 'DELETE',
     url: endpoint + "/_api/database/" + db,
     headers: {
@@ -494,12 +482,12 @@ module.exports.deleteDatabase = function (db, endpoint, authToken){
   };
 
   return new Promise((resolve, reject) => {
-    
+
     request(options, function (error, response, body) {
 
       console.log(response.statusCode);
 
-      if(error){
+      if (error) {
         console.log(error);
         throw new Error(error);
       }
@@ -507,7 +495,7 @@ module.exports.deleteDatabase = function (db, endpoint, authToken){
       console.log(body);
       body = JSON.parse(body);
       error = body.error;
-      
+
       if (error) {
         console.log(body);
         reject(body.errorMessage);
